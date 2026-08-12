@@ -43,6 +43,16 @@
       "categories": ["languages", "official"]
     },
     {
+      "id": "SkS-Other.orca-russian",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/SkS-Other/orca-russian.git",
+        "ref": "v1.0.0"
+      },
+      "description": "Russian translations for the Orca UI.",
+      "categories": ["languages"]
+    },
+    {
       "id": "stablyai.orca-minimal-icons",
       "source": {
         "kind": "git",
