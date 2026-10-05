@@ -47,9 +47,9 @@
       "source": {
         "kind": "git",
         "url": "https://github.com/Moksa1123/orca-zh-tw-installer.git",
-        "ref": "plugin-v3.0.2"
+        "ref": "plugin-v3.0.3"
       },
-      "description": "Traditional Chinese (Taiwan) language pack: ~13,800 translated strings with terminology aligned to the official VS Code zh-TW locale.",
+      "description": "Traditional Chinese (Taiwan) language pack: ~15,400 translated strings with terminology aligned to the official VS Code zh-TW locale.",
       "categories": ["languages"]
     },
     {
