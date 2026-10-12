@@ -47,9 +47,9 @@
       "source": {
         "kind": "git",
         "url": "https://github.com/taranttoola-create/orca-russian.git",
-        "ref": "v1.3.5"
+        "ref": "v1.3.6"
       },
-      "description": "Russian language pack for Orca 1.4.222: 15,196 translations covering menus, settings, palettes, dashboards, worktree tabs, dialogs, terminal shell settings, CSV, chats, accounts and onboarding. Settings search understands Russian words. No executable code.",
+      "description": "Russian language pack for Orca 1.4.224: 15,706 translations covering menus, settings, palettes, dashboards, worktree tabs, dialogs, terminal shell settings, CSV, chats, accounts, managed SSH servers, workspace links and chat appearance. Settings search understands Russian words. No executable code.",
       "categories": ["languages"]
     },
     {
