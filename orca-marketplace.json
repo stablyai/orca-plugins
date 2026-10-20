@@ -33,16 +33,6 @@
       "categories": ["themes", "official"]
     },
     {
-      "id": "stablyai.orca-portuguese",
-      "source": {
-        "kind": "git",
-        "url": "https://github.com/stablyai/orca-portuguese.git",
-        "ref": "v1.0.0"
-      },
-      "description": "Brazilian Portuguese translations for common Orca navigation.",
-      "categories": ["languages", "official"]
-    },
-    {
       "id": "stablyai.orca-minimal-icons",
       "source": {
         "kind": "git",
