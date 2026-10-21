@@ -71,6 +71,16 @@
       },
       "description": "Command aliases and optional shortcuts for frequent Orca views.",
       "categories": ["keybindings", "official"]
+    },
+    {
+      "id": "noobitoo.telegram-notifications",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/NooBiToo/orca-telegram-notifications.git",
+        "ref": "v0.4.1"
+      },
+      "description": "Telegram messages when agents change status: finished, needs attention, stuck.",
+      "categories": ["notifications"]
     }
   ]
 }
