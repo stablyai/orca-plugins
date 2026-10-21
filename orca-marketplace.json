@@ -71,6 +71,16 @@
       },
       "description": "Command aliases and optional shortcuts for frequent Orca views.",
       "categories": ["keybindings", "official"]
+    },
+    {
+      "id": "nacho.orca-discord-presence",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/nachodeluca/orca-discord-presence.git",
+        "ref": "v0.1.0"
+      },
+      "description": "Publishes Orca agent status to Discord Rich Presence.",
+      "categories": ["integrations"]
     }
   ]
 }
