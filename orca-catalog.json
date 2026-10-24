@@ -1,0 +1,229 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stablyai/orca/main/docs/schemas/plugins/orca-catalog.v2.schema.json",
+  "catalogVersion": 2,
+  "name": "Orca Official Plugins",
+  "owner": "stablyai",
+  "plugins": [
+    {
+      "id": "stablyai.orca-midnight-theme",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-midnight-theme.git",
+        "ref": "v1.0.0"
+      },
+      "description": "A quiet dark theme tuned for long coding sessions.",
+      "categories": [
+        "themes",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "2.0.0",
+          "commit": "febba189b41a7ffbdf9cbc2c61fd0c0c18810c5b",
+          "contentHash": "199231f3c3f379d1fa15f07c63cabc662984eb4f9f8cfded9e0e2672360946e0",
+          "execution": "data",
+          "minimumOrca": "1.4.240",
+          "types": [
+            "app-theme"
+          ],
+          "name": "Orca Midnight",
+          "contributes": [
+            {
+              "kind": "themes",
+              "name": "Orca Midnight"
+            }
+          ],
+          "license": "MIT"
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-nord-theme",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-nord-theme.git",
+        "ref": "v1.0.0"
+      },
+      "description": "A cool, low-contrast application theme inspired by arctic colors.",
+      "categories": [
+        "themes",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "2.0.0",
+          "commit": "829d1569f56b61d5b3dcd34347dc3731a1b4b428",
+          "contentHash": "7f774e4a8fa98caeeec5223ccc87609a51219f721bff80a6293ba99433cc78ff",
+          "execution": "data",
+          "minimumOrca": "1.4.240",
+          "types": [
+            "app-theme"
+          ],
+          "name": "Nord for Orca",
+          "contributes": [
+            {
+              "kind": "themes",
+              "name": "Nord"
+            }
+          ],
+          "license": "MIT"
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-minimal-icons",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-minimal-icons.git",
+        "ref": "v1.0.0"
+      },
+      "description": "A compact monochrome icon theme for common source files.",
+      "categories": [
+        "icons",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "2.0.0",
+          "commit": "ed3de3fb915696750fabcc9349217b86e41752e7",
+          "contentHash": "8071c37b42e3e951dcb84f6142ecea56e064cbcd2298c0c99aa182c75978a761",
+          "execution": "data",
+          "minimumOrca": "1.4.240",
+          "types": [
+            "icon-theme"
+          ],
+          "name": "Orca Minimal Icons",
+          "contributes": [
+            {
+              "kind": "iconThemes",
+              "name": "Minimal"
+            }
+          ],
+          "license": "MIT"
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-solarized-terminal",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-solarized-terminal.git",
+        "ref": "v1.0.0"
+      },
+      "description": "Solarized Dark terminal colors packaged for Orca.",
+      "categories": [
+        "terminal-themes",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "2.0.0",
+          "commit": "03a1526604eee3b367708d02182224e7826703d5",
+          "contentHash": "aee7be2f20e45c1a88dc8557bf0cc1e7315c3ddad6994b58eae9f4915f6e7f96",
+          "execution": "data",
+          "minimumOrca": "1.4.240",
+          "types": [
+            "terminal-theme"
+          ],
+          "name": "Solarized Terminal",
+          "contributes": [
+            {
+              "kind": "terminalThemes",
+              "name": "Solarized Dark"
+            }
+          ],
+          "license": "MIT"
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-multipass-recipes",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-multipass-recipes.git",
+        "ref": "v1.0.0"
+      },
+      "description": "A reviewed starter lifecycle for disposable Multipass workspaces.",
+      "categories": [
+        "vm-recipes",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "2.0.0",
+          "commit": "7ebab071b15ce26b87fe9a097e4a71a1387a3287",
+          "contentHash": "d45530e4e7ad78c7e900fd90763d65d14a4c3cbceddf267f149d028d5229049f",
+          "execution": "declarative",
+          "minimumOrca": "1.4.240",
+          "types": [
+            "instructions"
+          ],
+          "name": "Multipass VM Recipes",
+          "contributes": [
+            {
+              "kind": "vmRecipes",
+              "name": "recipes/ubuntu-lts.json"
+            }
+          ],
+          "license": "MIT"
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-navigation-shortcuts",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-navigation-shortcuts.git",
+        "ref": "v1.0.0"
+      },
+      "description": "Command aliases and optional shortcuts for frequent Orca views.",
+      "categories": [
+        "keybindings",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "2.0.0",
+          "commit": "a532559e23916b40c04b55ef50b8543cf00c4d34",
+          "contentHash": "3d8f49e9dadb4e77a3354617ec8b9da2fba8325e93f9b21ad50a27c0614f17a3",
+          "execution": "declarative",
+          "minimumOrca": "1.4.240",
+          "types": [
+            "instructions"
+          ],
+          "name": "Orca Navigation Shortcuts",
+          "contributes": [
+            {
+              "kind": "commands",
+              "name": "Open Tasks"
+            },
+            {
+              "kind": "commands",
+              "name": "Toggle Search"
+            },
+            {
+              "kind": "commands",
+              "name": "Toggle Source Control"
+            },
+            {
+              "kind": "keybindings",
+              "name": "Mod+Alt+T",
+              "detail": "open-tasks"
+            },
+            {
+              "kind": "keybindings",
+              "name": "Mod+Alt+F",
+              "detail": "toggle-search"
+            },
+            {
+              "kind": "keybindings",
+              "name": "Mod+Alt+G",
+              "detail": "toggle-source-control"
+            }
+          ],
+          "license": "MIT"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "note": "Plugins listed only in orca-marketplace.json for Orca builds that predate catalog format 2. Remove an id when its plugin moves into orca-catalog.json; never add new ones.",
+  "ids": [
+    "stablyai.orca-workflow-skills"
+  ]
+}

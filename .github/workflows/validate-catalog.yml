@@ -1,0 +1,55 @@
+name: Validate catalog
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # Orca commit whose validator and legacy export the catalog is checked with. Bump it deliberately.
+  ORCA_REF: d4473fbcf9e2eb951eec655c26304e703e7cc979
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out catalog
+        uses: actions/checkout@v4
+        with:
+          path: catalog
+          persist-credentials: false
+
+      - name: Check out Orca
+        uses: actions/checkout@v4
+        with:
+          repository: stablyai/orca
+          ref: ${{ env.ORCA_REF }}
+          path: orca
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: orca/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: orca/pnpm-lock.yaml
+
+      # Why no install scripts: the validator needs only the JavaScript dependencies, not Electron.
+      - name: Install Orca validator
+        working-directory: orca
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm run build:packages
+
+      - name: Validate catalog, releases, images and orca-marketplace.json
+        working-directory: catalog
+        env:
+          ORCA_DIR: ${{ github.workspace }}/orca
+        run: node scripts/check-catalog.mjs
