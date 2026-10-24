@@ -71,6 +71,16 @@
       },
       "description": "Command aliases and optional shortcuts for frequent Orca views.",
       "categories": ["keybindings", "official"]
+    },
+    {
+      "id": "smwbev.russian",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/smwbev/orca-russian.git",
+        "ref": "v5.1.173"
+      },
+      "description": "Russian translation of the Orca interface, re-released for each Orca version.",
+      "categories": ["languages"]
     }
   ]
 }
