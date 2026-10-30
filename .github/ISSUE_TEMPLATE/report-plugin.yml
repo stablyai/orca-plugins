@@ -1,0 +1,38 @@
+name: Report a plugin
+description: An official plugin that is harmful, broken or misleading.
+title: 'Report: '
+labels: [report]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security issue or active malware?** Don't file it here. Report it privately instead: https://github.com/stablyai/orca-plugins/security/advisories/new
+  - type: input
+    id: plugin-url
+    attributes:
+      label: Plugin
+      description: The plugin's page, such as https://www.onorca.dev/plugins/stablyai/orca-plugins/orca-nord-theme, or its id (stablyai.orca-nord-theme).
+    validations:
+      required: true
+  - type: dropdown
+    id: reason
+    attributes:
+      label: What is wrong
+      options:
+        - Malicious or harmful behaviour
+        - Impersonates another author, brand or Orca
+        - Trademark or copyright
+        - Licence problem
+        - Explicit content
+        - Paid or locked features
+        - Broken or misleading listing
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: What you saw, and how to reproduce it.
+    validations:
+      required: true
