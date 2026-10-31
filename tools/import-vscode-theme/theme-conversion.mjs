@@ -4,8 +4,17 @@ import {
   VSCODE_APP_THEME_COLORS,
   VSCODE_TERMINAL_COLORS
 } from './color-map.mjs'
-import { contrastRatio, flatten, parseHex, toHex } from './color-math.mjs'
-import { isRecord } from './theme-reading.mjs'
+import {
+  blend,
+  contrastRatio,
+  flatten,
+  isLightColor,
+  parseCssColor,
+  parseHex,
+  readableColor,
+  toHex
+} from './color-math.mjs'
+import { defaultRuleSettings, isRecord } from './theme-reading.mjs'
 
 // Why: VS Code's own defaults when a theme leaves the editor colors out.
 const DEFAULT_EDITOR = {
@@ -21,31 +30,39 @@ const MAX_SCOPE_LENGTH = 512
 const MAX_ID_BASE_LENGTH = 56
 const RESERVED_IDS = new Set(['prototype', 'constructor'])
 const FONT_STYLES = new Set(['italic', 'bold', 'underline', 'strikethrough'])
-const MIN_TEXT_CONTRAST = 4.5
+// Orca's contrast floors: text, git status names, focus rings, syntax colors.
+const MIN_TEXT = 4.5
+const MIN_STATUS = 3
+const MIN_RING = 2
+const MIN_SYNTAX = 3
+// Orca ignores borders under this alpha, so a fully transparent one is no border choice at all.
+const MIN_BORDER_ALPHA = 0.05
+const BORDER_TOKENS = new Set([
+  '--border',
+  '--input',
+  '--sidebar-border',
+  '--worktree-sidebar-border',
+  '--worktree-sidebar-active-border',
+  '--split-divider',
+  '--split-divider-hover'
+])
+const MAX_REPAIR_ROUNDS = 8
 const ENGINE = '>=1.4.245'
 
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`
 
-function firstColor(colors, keys) {
+function firstColor(colors, keys, token) {
   for (const key of keys) {
     const color = parseHex(colors[key])
-    if (color) {
+    if (color && !(BORDER_TOKENS.has(token) && color[3] < MIN_BORDER_ALPHA)) {
       return color
     }
   }
   return null
 }
 
-/** The scope-less rule VS Code themes use for the editor's default text and background. */
-function defaultRuleSettings(theme) {
-  const rule = theme.tokenColors.find(
-    (entry) => isRecord(entry) && entry.scope === undefined && isRecord(entry.settings)
-  )
-  return rule?.settings ?? {}
-}
-
 function editorColors(theme) {
-  const fallback = defaultRuleSettings(theme)
+  const fallback = defaultRuleSettings(theme.tokenColors)
   const defaults = DEFAULT_EDITOR[theme.base]
   const background = flatten(
     firstColor(theme.colors, ['editor.background']) ??
@@ -60,94 +77,154 @@ function editorColors(theme) {
   return { background, foreground: flatten(foreground, background) }
 }
 
-/** The surfaces a text token is read on, for the pairs where Orca drops both colors. */
-function surfacesOf(token) {
+/** What a text-like token is read on, and the contrast Orca requires there. */
+function readingOf(token) {
   if (token === '--foreground') {
-    return ['--background', '--editor-surface']
+    return { surfaces: ['--background', '--editor-surface'], min: MIN_TEXT }
   }
   if (token === '--muted-foreground') {
-    return ['--background', '--editor-surface', '--muted']
+    return { surfaces: ['--background', '--editor-surface', '--muted'], min: MIN_TEXT }
   }
   // Hovered inactive tabs take the active text color.
   if (token === '--tab-active-foreground') {
-    return ['--tab-active', '--tab-inactive']
+    return { surfaces: ['--tab-active', '--tab-inactive'], min: MIN_TEXT }
   }
-  return token.endsWith('-foreground') ? [token.slice(0, -'-foreground'.length)] : []
+  if (token === '--text-link') {
+    return { surfaces: ['--editor-surface'], min: MIN_TEXT }
+  }
+  if (token.startsWith('--git-decoration-')) {
+    return { surfaces: ['--sidebar'], min: MIN_STATUS }
+  }
+  if (token === '--tab-active-indicator') {
+    return { surfaces: ['--tab-active'], min: MIN_RING }
+  }
+  if (token.endsWith('-ring')) {
+    const surface = token === '--ring' ? '--background' : token.slice(0, -'-ring'.length)
+    return { surfaces: [surface], min: MIN_RING }
+  }
+  if (token.endsWith('-foreground')) {
+    return { surfaces: [token.slice(0, -'-foreground'.length)], min: MIN_TEXT }
+  }
+  return null
 }
 
 /** A token's color as painted: translucent ones over the opaque token beneath them. */
-function painted(token, tokens) {
-  const color = parseHex(tokens[token])
-  const under = TRANSLUCENT_APP_THEME_TOKENS[token]
-  if (!color || color[3] === 1 || !under) {
+function painted(token, tokens, depth = 0) {
+  const color = parseCssColor(tokens[token] ?? '')
+  if (!color || color[3] === 1 || depth > 4) {
     return color
   }
-  const base = painted(under, tokens) ?? parseHex(tokens['--background'])
+  const under = TRANSLUCENT_APP_THEME_TOKENS[token] ?? '--background'
+  const base = painted(under, tokens, depth + 1) ?? parseCssColor(tokens['--background'] ?? '')
   return base ? flatten(color, base) : null
 }
 
-function readableOn(text, token, tokens) {
-  return surfacesOf(token).every((surface) => {
-    const color = painted(surface, tokens)
-    return !color || contrastRatio(text, color) >= MIN_TEXT_CONTRAST
-  })
-}
-
-/** The dimmest mix of `--foreground` into `--background` that stays readable. */
-function readableMutedText(tokens) {
-  const foreground = parseHex(tokens['--foreground'])
-  const background = parseHex(tokens['--background'])
-  if (!foreground || !background) {
+/** A readable color for `token` on every surface it is read on, closest to its current one. */
+function readableFor(token, tokens) {
+  const reading = readingOf(token)
+  const current = painted(token, tokens) ?? parseCssColor(tokens['--foreground'] ?? '')
+  const surfaces = (reading?.surfaces ?? [])
+    .map((surface) => painted(surface, tokens))
+    .filter(Boolean)
+  if (!reading || !current || surfaces.length === 0) {
     return null
   }
-  for (let share = 0.7; share <= 1; share += 0.05) {
-    const mix = flatten([foreground[0], foreground[1], foreground[2], share], background)
-    if (readableOn(mix, '--muted-foreground', tokens)) {
-      return toHex(mix)
+  const away = isLightColor(surfaces[0]) ? [0, 0, 0, 1] : [255, 255, 255, 1]
+  for (const toward of [away, [0, 0, 0, 1], [255, 255, 255, 1]]) {
+    for (let percent = 0; percent <= 100; percent += 5) {
+      // Why the written hex: rounding can push a borderline color under the floor.
+      const hex = toHex(blend(current, toward, percent))
+      const written = parseHex(hex)
+      if (surfaces.every((surface) => contrastRatio(written, surface) >= reading.min)) {
+        return hex
+      }
     }
   }
   return null
 }
 
-/**
- * Orca drops both colors of a text/surface pair under 4.5:1, which would lose the surface too.
- * VS Code themes often use dim description text, so an unreadable text token is left to Orca's
- * derivation, and muted text (whose derived 70% mix can also fail) gets the dimmest readable mix.
- */
-function withoutUnreadableText(tokens, accepted) {
-  const readable = { ...tokens }
-  for (const token of Object.keys(tokens)) {
-    const text = parseHex(tokens[token])
-    if (token !== '--foreground' && text && !readableOn(text, token, tokens)) {
-      delete readable[token]
-    }
-  }
-  if (!readable['--muted-foreground'] && accepted.has('--muted-foreground')) {
-    const muted = readableMutedText(readable)
-    if (muted) {
-      readable['--muted-foreground'] = muted
-    }
-  }
-  return readable
+/** The text tokens read on `surface`, which can be made readable instead of losing it. */
+function textOn(surface, accepted) {
+  return [...accepted].filter((token) => readingOf(token)?.surfaces.includes(surface))
 }
 
-/** Orca tokens for one theme, limited to the tokens the target Orca accepts. */
-export function appTokens(theme, accepted) {
+/**
+ * Runs Orca's own contrast check and repairs what it would drop: a text color becomes the
+ * nearest readable one, a surface keeps its color and its text is made readable, and a
+ * translucent tint Orca drops is left to Orca. Returns the tokens and what still drops.
+ */
+function keptByOrcaContrast(tokens, base, orca) {
+  let current = { ...tokens }
+  let dropped = []
+  for (let round = 0; round < MAX_REPAIR_ROUNDS; round += 1) {
+    const complete = orca.complete(current)
+    const safe = orca.gate(complete, base)
+    dropped = Object.keys(complete).filter((token) => !(token in safe))
+    if (dropped.length === 0) {
+      break
+    }
+    const next = { ...current }
+    for (const token of dropped) {
+      const reading = readingOf(token)
+      if (reading) {
+        const fixed = readableFor(token, complete)
+        if (fixed) {
+          next[token] = fixed
+        }
+        continue
+      }
+      const texts = textOn(token, orca.appTokens)
+      for (const text of texts) {
+        const fixed = readableFor(text, { ...complete, ...next })
+        if (fixed) {
+          next[text] = fixed
+        }
+      }
+      if (texts.length === 0 && token in next) {
+        delete next[token]
+      }
+    }
+    if (JSON.stringify(next) === JSON.stringify(current)) {
+      break
+    }
+    current = next
+  }
+  return { tokens: current, dropped }
+}
+
+/** Orca tokens for one theme, limited to what the target Orca accepts and keeps. */
+export function appTokens(theme, orca, warnings = []) {
   const { background, foreground } = editorColors(theme)
+  if (isLightColor(background) !== (theme.base === 'light')) {
+    warnings.push(`${theme.label}: declared ${theme.base} but its editor background is not`)
+  }
   const colors = {
     ...theme.colors,
     'editor.background': toHex(background),
     'editor.foreground': toHex(foreground)
   }
   const tokens = {}
-  for (const [token, keys] of Object.entries(VSCODE_APP_THEME_COLORS)) {
-    const color = accepted.has(token) ? firstColor(colors, keys) : null
-    if (color) {
-      // Why flatten: Orca needs opaque text and surfaces to check their contrast.
-      tokens[token] = toHex(token in TRANSLUCENT_APP_THEME_TOKENS ? color : flatten(color, background))
+  const entries = Object.entries(VSCODE_APP_THEME_COLORS).filter(([token]) =>
+    orca.appTokens.has(token)
+  )
+  // Why surfaces first: a translucent text color is painted over its own surface.
+  const isText = ([token]) => readingOf(token) !== null
+  for (const [token, keys] of [...entries.filter((e) => !isText(e)), ...entries.filter(isText)]) {
+    const color = firstColor(colors, keys, token)
+    if (!color) {
+      continue
     }
+    const under =
+      readingOf(token)?.surfaces.map((surface) => painted(surface, tokens)).find(Boolean) ??
+      background
+    // Why flatten: Orca needs opaque text and surfaces to check their contrast.
+    tokens[token] = toHex(token in TRANSLUCENT_APP_THEME_TOKENS ? color : flatten(color, under))
   }
-  return withoutUnreadableText(tokens, accepted)
+  const kept = keptByOrcaContrast(tokens, theme.base, orca)
+  if (kept.dropped.length > 0) {
+    warnings.push(`${theme.label}: Orca's contrast check still drops ${kept.dropped.join(', ')}`)
+  }
+  return kept.tokens
 }
 
 function scopesOf(scope) {
@@ -161,16 +238,25 @@ function scopesOf(scope) {
 /**
  * VS Code rules in the shape Orca validates: one rule per distinct style, each scope once with
  * its last style per property (later rules win, as in VS Code). Descendant selectors (`a b`) are
- * dropped because Orca does not read them.
+ * dropped because Orca does not read them. With `editor` set, colors under Orca's 3:1 syntax
+ * floor move toward the editor text until they pass, instead of falling back to built-ins.
  */
-export function compactTokenColors(tokenColors, warnings, label) {
+export function compactTokenColors(tokenColors, warnings, label, editor) {
   const byScope = new Map()
   let descendant = 0
+  let lifted = 0
   for (const rule of tokenColors) {
     if (!isRecord(rule) || !isRecord(rule.settings)) {
       continue
     }
-    const foreground = parseHex(rule.settings.foreground)
+    let foreground = parseHex(rule.settings.foreground)
+    if (foreground && editor) {
+      foreground = flatten(foreground, editor.background)
+      if (contrastRatio(foreground, editor.background) < MIN_SYNTAX) {
+        foreground = readableColor(foreground, editor.background, MIN_SYNTAX, editor.foreground)
+        lifted += 1
+      }
+    }
     const fontStyle =
       typeof rule.settings.fontStyle === 'string'
         ? rule.settings.fontStyle
@@ -196,6 +282,9 @@ export function compactTokenColors(tokenColors, warnings, label) {
   if (descendant > 0) {
     warnings.push(`${label}: dropped ${descendant} descendant scope selectors Orca does not read`)
   }
+  if (lifted > 0) {
+    warnings.push(`${label}: raised ${lifted} code colors to 3:1 contrast with the editor`)
+  }
   const byStyle = new Map()
   for (const [scope, settings] of byScope) {
     const key = JSON.stringify([settings.foreground, settings.fontStyle])
@@ -213,9 +302,13 @@ export function compactTokenColors(tokenColors, warnings, label) {
   })
 }
 
-function appThemeFile(theme, accepted, warnings) {
-  const tokens = appTokens(theme, accepted)
-  const rules = compactTokenColors(theme.tokenColors, warnings, theme.label)
+function appThemeFile(theme, orca, warnings) {
+  const tokens = appTokens(theme, orca, warnings)
+  const editor = {
+    background: parseHex(tokens['--editor-surface'] ?? tokens['--background']),
+    foreground: parseHex(tokens['--foreground'])
+  }
+  const rules = compactTokenColors(theme.tokenColors, warnings, theme.label, editor)
   const fits = (text) => Buffer.byteLength(text) <= THEME_FILE_MAX_BYTES
   // Why minify before trimming: Orca caps a theme file at 16 KiB and code colors are most of it.
   const render = (kept) => {
@@ -240,12 +333,15 @@ function appThemeFile(theme, accepted, warnings) {
     }
   }
   if (low < rules.length) {
-    warnings.push(`${theme.label}: kept ${low} of ${rules.length} code color rules to fit Orca's limits`)
+    warnings.push(
+      `${theme.label}: kept ${low} of ${rules.length} code color rules to fit Orca's limits`
+    )
   }
   return render(low)
 }
 
-const TERMINAL_ANSI = new Set(['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'])
+const ANSI = new Set(['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'])
+const isAnsi = (key) => ANSI.has(key.replace(/^bright(.)/, (_, first) => first.toLowerCase()))
 
 function terminalPalette(theme, terminalKeys) {
   const editor = editorColors(theme)
@@ -256,23 +352,21 @@ function terminalPalette(theme, terminalKeys) {
   const fallbacks = { background, foreground: editor.foreground }
   const palette = {}
   for (const key of terminalKeys) {
-    const color = (VSCODE_TERMINAL_COLORS[key] && firstColor(theme.colors, VSCODE_TERMINAL_COLORS[key])) ?? fallbacks[key]
+    const keys = VSCODE_TERMINAL_COLORS[key] ?? []
+    const color = key === 'background' ? background : (firstColor(theme.colors, keys) ?? fallbacks[key])
     if (color) {
       // Why flatten: terminal palettes are opaque hex; VS Code paints alpha over the panel.
-      palette[key] = toHex(flatten(color, key === 'background' ? editor.background : background))
+      palette[key] = toHex(flatten(color, background))
     }
   }
-  const usable = Object.keys(palette).some((key) =>
-    TERMINAL_ANSI.has(key.replace(/^bright(.)/, (_, first) => first.toLowerCase()))
-  )
-  return usable ? palette : null
+  return Object.keys(palette).some(isAnsi) ? palette : null
 }
 
 function slug(label, taken) {
   const cut = label
-    .toLowerCase()
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .slice(0, MAX_ID_BASE_LENGTH)
     .replace(/^-+|-+$/g, '')
@@ -287,8 +381,9 @@ function slug(label, taken) {
 
 /**
  * The files of an Orca plugin with an app theme for every VS Code theme, plus a terminal theme
- * from its `terminal.ansi*` colors. `orca` names the tokens and terminal slots the target Orca
- * accepts; `identity` is `{ publisher, id, name, license?, description?, repository? }`.
+ * for each one with `terminal.ansi*` colors. `orca` is the target Orca's schema (see
+ * orca-schema.mjs); `identity` is `{ publisher, id, name, license?, description?, repository?,
+ * version? }`.
  */
 export function renderThemePlugin(set, identity, orca) {
   const warnings = [...set.warnings]
@@ -298,7 +393,7 @@ export function renderThemePlugin(set, identity, orca) {
   const taken = new Set()
   for (const theme of set.themes) {
     const id = slug(theme.label, taken)
-    files[`themes/${id}.json`] = appThemeFile(theme, orca.appTokens, warnings)
+    files[`themes/${id}.json`] = appThemeFile(theme, orca, warnings)
     themes.push({ id, title: theme.label, path: `themes/${id}.json` })
     const palette = terminalPalette(theme, orca.terminalKeys)
     if (palette) {
@@ -308,8 +403,6 @@ export function renderThemePlugin(set, identity, orca) {
       warnings.push(`${theme.label}: no terminal theme; it sets no terminal.ansi* colors`)
     }
   }
-  const description =
-    identity.description ?? `${identity.name}, converted from a VS Code color theme.`
   files['orca-plugin.json'] = json({
     manifestVersion: 2,
     id: identity.id,
@@ -317,7 +410,7 @@ export function renderThemePlugin(set, identity, orca) {
     name: identity.name,
     version: identity.version ?? '1.0.0',
     execution: 'data',
-    description,
+    description: identity.description ?? `${identity.name}, converted from a VS Code color theme.`,
     ...(identity.license ? { license: identity.license } : {}),
     ...(identity.repository ? { repository: identity.repository } : {}),
     engines: { orca: ENGINE },

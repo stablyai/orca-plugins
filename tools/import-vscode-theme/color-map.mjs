@@ -29,8 +29,8 @@ export const VSCODE_APP_THEME_COLORS = {
   '--sidebar-foreground': ['sideBar.foreground'],
   '--sidebar-border': ['sideBar.border'],
   // The tokens below need Orca with stablyai/orca#36578.
-  '--worktree-sidebar-active': ['list.activeSelectionBackground'],
-  '--worktree-sidebar-active-border': ['list.focusAndSelectionOutline', 'list.focusOutline'],
+  '--worktree-sidebar-active': ['list.inactiveSelectionBackground'],
+  '--worktree-sidebar-active-border': ['list.inactiveFocusOutline'],
   '--host-badge': ['badge.background'],
   '--host-badge-foreground': ['badge.foreground'],
   '--tab-bar': ['editorGroupHeader.tabsBackground'],
@@ -43,14 +43,14 @@ export const VSCODE_APP_THEME_COLORS = {
   '--split-divider-hover': ['sash.hoverBorder'],
   '--chat-user-message': ['chat.requestBackground'],
   '--text-link': ['textLink.foreground'],
-  '--diff-added': ['editorOverviewRuler.addedForeground', 'editorGutter.addedBackground'],
+  '--diff-added': ['gitDecoration.addedResourceForeground', 'editorGutter.addedBackground'],
   '--diff-added-background': [
     'diffEditor.insertedLineBackground',
     'diffEditor.insertedTextBackground'
   ],
   '--diff-added-emphasis': ['diffEditor.insertedTextBackground'],
   '--diff-added-gutter': ['diffEditorGutter.insertedLineBackground'],
-  '--diff-removed': ['editorOverviewRuler.deletedForeground', 'editorGutter.deletedBackground'],
+  '--diff-removed': ['gitDecoration.deletedResourceForeground', 'editorGutter.deletedBackground'],
   '--diff-removed-background': [
     'diffEditor.removedLineBackground',
     'diffEditor.removedTextBackground'
@@ -72,9 +72,9 @@ export const TRANSLUCENT_APP_THEME_TOKENS = {
   '--border': '--background',
   '--input': '--background',
   '--sidebar-border': '--sidebar',
-  '--worktree-sidebar-active': '--sidebar',
-  '--worktree-sidebar-active-border': '--sidebar',
-  '--host-badge': '--sidebar',
+  '--worktree-sidebar-active': '--worktree-sidebar',
+  '--worktree-sidebar-active-border': '--worktree-sidebar',
+  '--host-badge': '--worktree-sidebar',
   '--split-divider': '--background',
   '--split-divider-hover': '--background',
   '--chat-user-message': '--background',

@@ -1,10 +1,13 @@
-// Run with: node --test tools/
+// Run with: node --test "tools/**/*.test.mjs" (set ORCA_DIR to also check Orca's contrast rules)
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import process from 'node:process'
 import { afterEach, describe, it } from 'node:test'
 import { VSCODE_APP_THEME_COLORS } from './color-map.mjs'
+import { contrastRatio, parseCssColor } from './color-math.mjs'
+import { loadOrcaSchema } from './orca-schema.mjs'
 import { compactTokenColors, renderThemePlugin } from './theme-conversion.mjs'
 import { parseJsonc, readVscodeThemes, ThemeReadError } from './theme-reading.mjs'
 
@@ -25,9 +28,26 @@ function folder(files) {
 }
 
 const identity = { publisher: 'acme', id: 'night', name: 'Night' }
+// A stand-in for Orca's contrast check: it drops both colors of an unreadable text pair.
+const PAIRS = [
+  ['--background', '--foreground'],
+  ['--background', '--muted-foreground']
+]
 const orca = {
   appTokens: new Set(Object.keys(VSCODE_APP_THEME_COLORS)),
-  terminalKeys: ['background', 'foreground', 'selectionBackground', 'red']
+  terminalKeys: ['background', 'foreground', 'selectionBackground', 'red'],
+  complete: (tokens) => ({ ...tokens }),
+  gate: (tokens) => {
+    const kept = { ...tokens }
+    for (const [surface, text] of PAIRS) {
+      const [a, b] = [parseCssColor(tokens[surface] ?? ''), parseCssColor(tokens[text] ?? '')]
+      if (a && b && contrastRatio(a, b) < 4.5) {
+        delete kept[surface]
+        delete kept[text]
+      }
+    }
+    return kept
+  }
 }
 
 describe('VS Code theme import', () => {
@@ -144,7 +164,46 @@ describe('VS Code theme import', () => {
     const plugin = renderThemePlugin(readVscodeThemes(path.join(dir, 'theme.json')), identity, orca)
     const { tokens } = JSON.parse(plugin.files['themes/theme.json'])
     assert.equal(tokens['--background'], '#e6e7ed')
-    assert.notEqual(tokens['--muted-foreground'], '#9699a3')
+    const muted = parseCssColor(tokens['--muted-foreground'])
+    assert.ok(contrastRatio(muted, parseCssColor('#e6e7ed')) >= 4.5)
+  })
+
+  it('raises code colors under 3:1 toward the editor text', () => {
+    const warnings = []
+    const [rule] = compactTokenColors(
+      [{ scope: 'comment', settings: { foreground: '#2a2a2a' } }],
+      warnings,
+      'Night',
+      { background: [30, 30, 30, 1], foreground: [212, 212, 212, 1] }
+    )
+    assert.ok(contrastRatio(parseCssColor(rule.settings.foreground), [30, 30, 30, 1]) >= 3)
+    assert.match(warnings[0], /raised 1 code colors/)
+  })
+
+  it("keeps every token through Orca's own contrast check", { skip: !process.env.ORCA_DIR }, async () => {
+    const real = await loadOrcaSchema(process.env.ORCA_DIR)
+    const dir = folder({
+      'theme.json': JSON.stringify({
+        type: 'dark',
+        colors: {
+          'editor.background': '#1e1e1e',
+          'editor.foreground': '#d4d4d4',
+          descriptionForeground: '#5a5a5a',
+          'button.background': '#0e639c',
+          'badge.background': '#4d4d4d',
+          'tab.inactiveForeground': '#ffffff80',
+          'panel.border': '#00000000',
+          'terminal.ansiRed': '#f14c4c'
+        }
+      })
+    })
+    const warnings = []
+    const plugin = renderThemePlugin(readVscodeThemes(path.join(dir, 'theme.json')), identity, real)
+    warnings.push(...plugin.warnings)
+    const { base, tokens } = JSON.parse(plugin.files['themes/theme.json'])
+    const complete = real.complete(tokens)
+    assert.deepEqual(Object.keys(complete).filter((token) => !(token in real.gate(complete, base))), [])
+    assert.ok(!('--border' in tokens))
   })
 
   it('refuses an include outside the imported folder', () => {

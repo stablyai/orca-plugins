@@ -17,7 +17,9 @@ export function isRecord(value) {
 }
 
 /** JSON with comments and trailing commas, as VS Code reads theme files. */
-export function parseJsonc(text) {
+export function parseJsonc(source) {
+  // Why: VS Code strips a byte-order mark; JSON.parse rejects it.
+  const text = source.replace(/^\uFEFF/, '')
   let out = ''
   let inString = false
   for (let index = 0; index < text.length; index += 1) {
@@ -39,7 +41,10 @@ export function parseJsonc(text) {
       out += '\n'
     } else if (char === '/' && text[index + 1] === '*') {
       const end = text.indexOf('*/', index + 2)
-      index = end === -1 ? text.length : end + 1
+      if (end === -1) {
+        throw new SyntaxError('unterminated /* comment')
+      }
+      index = end + 1
       out += ' '
     } else {
       out += char
@@ -84,17 +89,22 @@ function readJsonc(file) {
   }
   try {
     return parseJsonc(readFileSync(file, 'utf8'))
-  } catch {
-    throw new ThemeReadError(`${file} is not valid JSON`)
+  } catch (error) {
+    throw new ThemeReadError(`${file} is not valid JSON: ${error.message}`)
   }
 }
 
 /** A file the theme names, kept inside the imported folder after following symlinks. */
-function containedFile(root, from, name) {
+export function containedFile(root, from, name) {
   const target = path.resolve(path.dirname(from), name)
   const real = existsSync(target) ? realpathSync(target) : target
   const inside = path.relative(root, real)
-  if (inside === '' || inside.startsWith('..') || path.isAbsolute(inside)) {
+  if (
+    inside === '' ||
+    inside === '..' ||
+    inside.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(inside)
+  ) {
     throw new ThemeReadError(`${name} points outside ${root}`)
   }
   return real
@@ -169,13 +179,21 @@ function declaredBase(type) {
   return null
 }
 
+/** The scope-less rules VS Code themes use for the editor's default colors; later ones win. */
+export function defaultRuleSettings(tokenColors) {
+  return Object.assign(
+    {},
+    ...tokenColors
+      .filter((rule) => isRecord(rule) && rule.scope === undefined && isRecord(rule.settings))
+      .map((rule) => rule.settings)
+  )
+}
+
 /** For an untyped theme: light when its editor background is; VS Code's own fallback is dark. */
 function guessedBase(theme) {
-  const defaults = theme.tokenColors.find(
-    (rule) => isRecord(rule) && rule.scope === undefined && isRecord(rule.settings)
-  )
   const background =
-    parseHex(theme.colors['editor.background']) ?? parseHex(defaults?.settings?.background)
+    parseHex(theme.colors['editor.background']) ??
+    parseHex(defaultRuleSettings(theme.tokenColors).background)
   return background && isLightColor(background) ? 'light' : 'dark'
 }
 
@@ -193,9 +211,14 @@ function themeFrom(root, file, warnings, contributed = {}) {
 }
 
 /** Resolves `%key%` placeholders from the extension's package.nls.json. */
-function nlsResolver(dir) {
+function nlsResolver(dir, warnings) {
   const file = path.join(dir, 'package.nls.json')
-  const strings = existsSync(file) ? readJsonc(file) : {}
+  let strings = {}
+  try {
+    strings = existsSync(file) ? readJsonc(file) : {}
+  } catch (error) {
+    warnings.push(`${error.message}; labels keep their placeholders`)
+  }
   return (value) => {
     const key = typeof value === 'string' ? /^%(.+)%$/.exec(value)?.[1] : undefined
     if (key === undefined) {
@@ -206,10 +229,10 @@ function nlsResolver(dir) {
 }
 
 /**
- * Reads a VS Code theme file, or every JSON color theme an extension folder contributes.
- * Returns `{ name?, root, themes: [{ label, base, colors, tokenColors }], warnings }`.
+ * Reads a VS Code theme file, or every JSON color theme an extension folder contributes (only
+ * the labels in `only`, when given). Returns `{ name?, root, themes: [{ label, base, colors, tokenColors }], warnings }`.
  */
-export function readVscodeThemes(source) {
+export function readVscodeThemes(source, { only } = {}) {
   const resolved = path.resolve(source)
   if (!existsSync(resolved)) {
     throw new ThemeReadError(`${source} does not exist`)
@@ -225,9 +248,13 @@ export function readVscodeThemes(source) {
   const entries = (Array.isArray(pkg?.contributes?.themes) ? pkg.contributes.themes : []).filter(
     (entry) => isRecord(entry) && typeof entry.path === 'string'
   )
-  const localized = nlsResolver(real)
+  const localized = nlsResolver(real, warnings)
   const themes = []
   for (const entry of entries) {
+    const label = localized(entry.label)
+    if (only && !only.has(label)) {
+      continue
+    }
     if (themes.length === MAX_THEMES) {
       warnings.push(`kept the first ${MAX_THEMES} themes; a plugin holds at most that many`)
       break
@@ -238,7 +265,7 @@ export function readVscodeThemes(source) {
     }
     try {
       const file = containedFile(real, manifestFile, entry.path)
-      themes.push(themeFrom(real, file, warnings, { ...entry, label: localized(entry.label) }))
+      themes.push(themeFrom(real, file, warnings, { ...entry, label }))
     } catch (error) {
       if (!(error instanceof ThemeReadError)) {
         throw error

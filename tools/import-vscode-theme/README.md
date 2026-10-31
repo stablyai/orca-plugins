@@ -13,8 +13,9 @@ ORCA_DIR=/path/to/orca node tools/import-vscode-theme/import-vscode-theme.mjs \
 ```
 
 `ORCA_DIR` is an Orca checkout with dependencies installed (`pnpm install`, then
-`pnpm run build:packages`), as for the catalog scripts. The tool reads Orca's list of public
-theme tokens and terminal slots from it, and writes only what that Orca accepts.
+`pnpm run build:packages`), as for the catalog scripts. The tool reads Orca's public theme
+tokens, terminal slots, token derivations and contrast check from it, writes only what that Orca
+accepts, and repairs anything that Orca's contrast check would drop.
 
 | Flag | Meaning |
 | --- | --- |
@@ -22,7 +23,8 @@ theme tokens and terminal slots from it, and writes only what that Orca accepts.
 | `--id`, `--name`, `--description`, `--version`, `--repository` | Manifest fields. `--id` defaults to the output folder's name. |
 | `--license` | SPDX id for the manifest's `license`. |
 | `--license-file` | The upstream license to copy to `LICENSE`. Defaults to a `LICENSE` file next to the theme. |
-| `--source-url` | Upstream link for the README's attribution. |
+| `--source-url` | Upstream `https` link for the README's attribution. |
+| `--theme` | For an extension folder, convert only the themes with this label. Repeatable. |
 
 The tool writes into a new or empty folder and never overwrites. If Orca's validator rejects
 the result, it exits 2 and leaves the files in place.
@@ -41,11 +43,15 @@ the result, it exits 2 and leaves the files in place.
 - Orca requires opaque text and surfaces, so translucent VS Code colors are painted onto the
   editor background. The borders, diff tints, active row, host badge and chat message tokens that
   Orca accepts translucent keep their alpha.
-- Orca drops both colors of a text/surface pair under 4.5:1 contrast. VS Code themes often use dim
-  secondary text, so such a text color is left out and Orca derives it. `--muted-foreground` gets
-  the dimmest mix of the foreground that stays readable. This keeps the theme's backgrounds.
+- The result is run through Orca's own contrast check, with Orca's own derivations for omitted
+  tokens. Orca drops both colors of an unreadable text/surface pair, so the tool repairs what it
+  would drop instead: a text color moves to the nearest readable one, and a surface keeps its
+  color while its text is made readable. VS Code themes often use dim secondary text, so this
+  is what keeps their backgrounds. Anything still dropped is reported as a warning.
+- Fully transparent borders are skipped, so the next VS Code key (or Orca's default) applies.
 - `tokenColors` carry over: each scope is kept once with its last style per property, as VS Code
-  resolves it. Scopes with the same style share one rule, and the file is minified, then trimmed
+  resolves it. A code color under 3:1 contrast with the editor, which Orca would replace with its
+  built-in color, moves toward the editor text until it passes. Scopes with the same style share one rule, and the file is minified, then trimmed
   from the end, to fit Orca's 16 KiB theme-file limit.
 - `include` files are flattened (the including theme wins), and a `"default"` color unsets an
   inherited one. Paths must stay inside the imported folder, including through symlinks.
@@ -57,5 +63,7 @@ Check the upstream license before publishing a converted theme, and keep its not
 ## Tests
 
 ```sh
-node --test "tools/**/*.test.mjs"
+ORCA_DIR=/path/to/orca node --test "tools/**/*.test.mjs"
 ```
+
+Without `ORCA_DIR`, the test against Orca's own contrast check is skipped.
