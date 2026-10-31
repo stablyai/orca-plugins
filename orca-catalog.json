@@ -2010,6 +2010,43 @@
       ],
       "releases": [
         {
+          "version": "1.1.0",
+          "commit": "2af9a96f902e616e0f200f7ff7a91c69c8ebd66c",
+          "contentHash": "21f2dcecf215f92cb122732143a7d511433c7eb729deb8e588ba5a27a48b1aec",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "Material Icon Theme for Orca",
+          "contributes": [
+            {
+              "kind": "iconThemes",
+              "name": "Material Icons"
+            },
+            {
+              "kind": "iconThemes",
+              "name": "Material Icons (Light)"
+            }
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-material-icons/dark.png",
+              "alt": "Material Icons in Orca's file explorer and editor tabs, dark mode",
+              "sha256": "0d372d31c4545f22403861ebbb9589cba9327db3cdc4f991d63800eeac9a3c85",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/orca-material-icons/light.png",
+                "alt": "Material Icons (Light) in Orca's file explorer and editor tabs, light mode",
+                "sha256": "86642fbb7e7237556b6c724f8c8a642e7a4f0e28862e6ab58257cda4008ff18a",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          }
+        },
+        {
           "version": "1.0.0",
           "commit": "af1b8721272ecc107361aac95c92f66b2a633a9d",
           "contentHash": "f3afa1838004f036d3b5031664b4f0127142ebdc1a0232705f76bb5dc7e547ff",

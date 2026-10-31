@@ -1,6 +1,6 @@
 # Material Icon Theme for Orca
 
-Colorful file icons from [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme) in Orca: about 470 file types and names, from TypeScript and Rust to Dockerfiles, lockfiles and CI configs.
+Colorful file and folder icons from [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme) in Orca: about 470 file types and names, from TypeScript and Rust to Dockerfiles, lockfiles and CI configs, plus icons for common folders such as `src`, `docs`, `tests` and `.github`.
 
 ![Material Icons in Orca's file explorer with a dark theme](../../assets/orca-material-icons/dark.png)
 
@@ -19,9 +19,11 @@ After installing it from **Settings → Plugins**, open **Settings → Appearanc
 
 Orca looks up a file's exact name first (`package.json`, `Dockerfile`, `.gitignore`), then its longest known suffix (`.test.ts` before `.ts`). Names are matched without regard to case. Files with no match keep Orca's default file icon.
 
+Folders are matched by their own name, with an open variant when expanded: `src`, `docs`, `test`, `tests`, `scripts`, `public`, `assets`, `components`, `lib`, `config`, `.github`, `node_modules`, `dist`, `build`, `.vscode`, `images`, `packages`, `api` and `utils`. Other folders use the plain folder icon. Folder icons need an Orca release newer than 1.4.245; older releases show the plain folder icon everywhere.
+
 ## Differences from Material Icon Theme
 
-- **Folders use one icon.** Orca's icon themes don't have per-folder icons yet, so `src`, `test` and `.github` look like any other folder.
+- **Common folders only.** Material has icons for thousands of folder names; this plugin maps the 19 most common ones above. Workspace root folders have no special icon.
 - **A curated set.** Orca allows 512 mappings per icon theme, so this plugin covers the most common file names and extensions rather than all of Material's. A few of Material's icons are left out because they are drawn with SVG features Orca doesn't allow in icon files.
 
 ## Rebuilding
