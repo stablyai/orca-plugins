@@ -3,9 +3,9 @@
   "id": "orca-material-icons",
   "publisher": "stablyai",
   "name": "Material Icon Theme for Orca",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "execution": "data",
-  "description": "Colorful file icons from Material Icon Theme for about 470 common file types and names, with a variant for light themes.",
+  "description": "Colorful file and folder icons from Material Icon Theme for about 470 common file types and names and 19 common folders, with a variant for light themes.",
   "license": "MIT",
   "repository": "https://github.com/stablyai/orca-plugins/tree/main/plugins/material-icons",
   "engines": {
