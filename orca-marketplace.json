@@ -71,6 +71,16 @@
       },
       "description": "Command aliases and optional shortcuts for frequent Orca views.",
       "categories": ["keybindings", "official"]
+    },
+    {
+      "id": "nknwns.wakatime",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/nknwns/orca-wakatime.git",
+        "ref": "v0.1.1"
+      },
+      "description": "Automatic WakaTime time tracking: focused files, saves, terminal, built-in browser, and AI agent time.",
+      "categories": ["integrations"]
     }
   ]
 }
