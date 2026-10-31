@@ -122,7 +122,7 @@ function painted(token, tokens, depth = 0) {
 /** A readable color for `token` on every surface it is read on, closest to its current one. */
 function readableFor(token, tokens) {
   const reading = readingOf(token)
-  const current = painted(token, tokens) ?? parseCssColor(tokens['--foreground'] ?? '')
+  const current = painted(token, tokens)
   const surfaces = (reading?.surfaces ?? [])
     .map((surface) => painted(surface, tokens))
     .filter(Boolean)
@@ -148,6 +148,15 @@ function textOn(surface, accepted) {
   return [...accepted].filter((token) => readingOf(token)?.surfaces.includes(surface))
 }
 
+function droppedByOrca(tokens, base, orca) {
+  const complete = orca.complete(tokens)
+  const safe = orca.gate(complete, base)
+  return {
+    view: orca.effective ? orca.effective(complete, base) : complete,
+    dropped: Object.keys(complete).filter((token) => !(token in safe))
+  }
+}
+
 /**
  * Runs Orca's own contrast check and repairs what it would drop: a text color becomes the
  * nearest readable one, a surface keeps its color and its text is made readable, and a
@@ -155,32 +164,23 @@ function textOn(surface, accepted) {
  */
 function keptByOrcaContrast(tokens, base, orca) {
   let current = { ...tokens }
-  let dropped = []
   for (let round = 0; round < MAX_REPAIR_ROUNDS; round += 1) {
-    const complete = orca.complete(current)
-    const safe = orca.gate(complete, base)
-    dropped = Object.keys(complete).filter((token) => !(token in safe))
+    const { view, dropped } = droppedByOrca(current, base, orca)
     if (dropped.length === 0) {
       break
     }
     const next = { ...current }
     for (const token of dropped) {
-      const reading = readingOf(token)
-      if (reading) {
-        const fixed = readableFor(token, complete)
-        if (fixed) {
-          next[token] = fixed
-        }
-        continue
-      }
-      const texts = textOn(token, orca.appTokens)
-      for (const text of texts) {
-        const fixed = readableFor(text, { ...complete, ...next })
+      // Why only present tokens: repairing a text the theme never set would freeze a derived
+      // color (or replace Orca's status and link hues with grey).
+      const texts = readingOf(token) ? [token] : textOn(token, orca.appTokens)
+      for (const text of texts.filter((name) => name in view)) {
+        const fixed = readableFor(text, { ...view, ...next })
         if (fixed) {
           next[text] = fixed
         }
       }
-      if (texts.length === 0 && token in next) {
+      if (!readingOf(token) && texts.length === 0 && token in next) {
         delete next[token]
       }
     }
@@ -189,7 +189,13 @@ function keptByOrcaContrast(tokens, base, orca) {
     }
     current = next
   }
-  return { tokens: current, dropped }
+  return { tokens: current, dropped: droppedByOrca(current, base, orca).dropped }
+}
+
+// Monaco's own vs / vs-dark syntax colors, which Orca keeps only on an editor they read on.
+const BUILT_IN_SYNTAX = {
+  light: ['#008000', '#a31515', '#0000ff', '#008080', '#098658'],
+  dark: ['#608b4e', '#ce9178', '#569cd6', '#3dc9b0', '#b5cea8']
 }
 
 /** Orca tokens for one theme, limited to what the target Orca accepts and keeps. */
@@ -223,6 +229,13 @@ export function appTokens(theme, orca, warnings = []) {
   const kept = keptByOrcaContrast(tokens, theme.base, orca)
   if (kept.dropped.length > 0) {
     warnings.push(`${theme.label}: Orca's contrast check still drops ${kept.dropped.join(', ')}`)
+  }
+  const editor = parseHex(kept.tokens['--editor-surface'] ?? kept.tokens['--background'])
+  if (
+    editor &&
+    BUILT_IN_SYNTAX[theme.base].some((color) => contrastRatio(parseHex(color), editor) < MIN_SYNTAX)
+  ) {
+    warnings.push(`${theme.label}: Orca keeps its plain editor colors; the editor background is too mid-toned for its built-in code colors`)
   }
   return kept.tokens
 }

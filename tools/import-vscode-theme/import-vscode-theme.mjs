@@ -4,7 +4,6 @@ import { execFileSync } from 'node:child_process'
 import {
   copyFileSync,
   existsSync,
-  lstatSync,
   mkdirSync,
   readdirSync,
   statSync,
@@ -20,7 +19,8 @@ import { containedFile, readVscodeThemes, ThemeReadError } from './theme-reading
 const USAGE = `Usage: ORCA_DIR=/path/to/orca node tools/import-vscode-theme/import-vscode-theme.mjs \\
   <theme.json | extension folder> <new plugin folder> --publisher <owner> [--id <id>]
   [--name <name>] [--description <text>] [--version <x.y.z>] [--repository <url>]
-  [--license <SPDX>] [--license-file <path>] [--source-url <url>] [--theme <label>]...`
+  [--license <SPDX>] [--license-file <path>] [--source-url <url>] [--theme <label>]...
+  [--title <label>=<title>]...`
 const STRING_FLAGS = [
   'publisher',
   'id',
@@ -44,7 +44,8 @@ try {
     allowPositionals: true,
     options: {
       ...Object.fromEntries(STRING_FLAGS.map((name) => [name, { type: 'string' }])),
-      theme: { type: 'string', multiple: true }
+      theme: { type: 'string', multiple: true },
+      title: { type: 'string', multiple: true }
     }
   })
 } catch (error) {
@@ -89,10 +90,21 @@ try {
 } catch (error) {
   fail(error instanceof ThemeReadError ? error.message : String(error))
 }
-if (set.themes.length === 0) {
-  fail(`no theme matched --theme ${flags.theme.join(', ')}`)
+// Why retitle: the id derives from the title, and an updated plugin must keep its theme ids.
+const titles = new Map(
+  (flags.title ?? []).map((entry) => {
+    const split = entry.indexOf('=')
+    if (split < 1) {
+      fail(`--title takes <VS Code label>=<title>, not ${entry}`)
+    }
+    return [entry.slice(0, split), entry.slice(split + 1)]
+  })
+)
+for (const theme of set.themes) {
+  theme.label = titles.get(theme.label) ?? theme.label
 }
 
+const licenseWarnings = []
 /** The upstream license: the given file, or a regular LICENSE file inside the imported folder. */
 function licenseFile() {
   if (flags['license-file']) {
@@ -102,15 +114,19 @@ function licenseFile() {
     }
     return file
   }
-  const name = readdirSync(set.root).find((entry) => /^licen[cs]e(\.(md|txt))?$/i.test(entry))
+  // Why folders only: a lone theme file's folder (say, Downloads) holds unrelated files.
+  const name = set.folder
+    ? readdirSync(set.root).find((entry) => /^licen[cs]e(\.(md|txt))?$/i.test(entry))
+    : undefined
   if (!name) {
     return null
   }
   try {
     // Why contained and regular: an upstream LICENSE symlink must not copy a private file.
     const file = containedFile(set.root, path.join(set.root, 'package.json'), name)
-    return lstatSync(file).isFile() ? file : null
+    return statSync(file).isFile() ? file : null
   } catch {
+    licenseWarnings.push(`${name} points outside the imported folder; not copied`)
     return null
   }
 }
@@ -137,6 +153,7 @@ const { files, warnings } = renderThemePlugin(
   },
   orca
 )
+warnings.push(...licenseWarnings)
 if (!license) {
   warnings.push('no LICENSE copied; pass --license-file before publishing')
 } else if (!flags.license) {

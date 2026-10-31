@@ -150,7 +150,7 @@ describe('VS Code theme import', () => {
     }
   })
 
-  it('leaves dim text to Orca so its contrast check keeps the surface', () => {
+  it('makes dim text readable so the contrast check keeps the surface', () => {
     const dir = folder({
       'theme.json': JSON.stringify({
         type: 'light',
@@ -197,13 +197,14 @@ describe('VS Code theme import', () => {
         }
       })
     })
-    const warnings = []
     const plugin = renderThemePlugin(readVscodeThemes(path.join(dir, 'theme.json')), identity, real)
-    warnings.push(...plugin.warnings)
+    assert.deepEqual(plugin.warnings, [])
     const { base, tokens } = JSON.parse(plugin.files['themes/theme.json'])
     const complete = real.complete(tokens)
     assert.deepEqual(Object.keys(complete).filter((token) => !(token in real.gate(complete, base))), [])
     assert.ok(!('--border' in tokens))
+    // Colors the theme never set stay Orca's own, such as the status hues.
+    assert.ok(!Object.keys(tokens).some((token) => token.startsWith('--git-decoration-')))
   })
 
   it('refuses an include outside the imported folder', () => {

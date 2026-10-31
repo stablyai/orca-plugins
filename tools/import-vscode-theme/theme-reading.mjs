@@ -240,8 +240,11 @@ export function readVscodeThemes(source, { only } = {}) {
   const real = realpathSync(resolved)
   const warnings = []
   if (!statSync(real).isDirectory()) {
+    if (only) {
+      throw new ThemeReadError('--theme picks themes from an extension folder, not a theme file')
+    }
     const root = path.dirname(real)
-    return { root, themes: [themeFrom(root, real, warnings)], warnings }
+    return { root, folder: false, themes: [themeFrom(root, real, warnings)], warnings }
   }
   const manifestFile = path.join(real, 'package.json')
   const pkg = readJsonc(manifestFile)
@@ -274,8 +277,12 @@ export function readVscodeThemes(source, { only } = {}) {
     }
   }
   if (themes.length === 0) {
-    throw new ThemeReadError(`${manifestFile} contributes no readable JSON color themes`)
+    throw new ThemeReadError(
+      only
+        ? `no readable theme in ${manifestFile} is labelled ${[...only].join(', ')}`
+        : `${manifestFile} contributes no readable JSON color themes`
+    )
   }
   const name = isRecord(pkg) ? cleanTitle(localized(pkg.displayName)) : null
-  return { ...(name ? { name } : {}), root: real, themes, warnings }
+  return { ...(name ? { name } : {}), root: real, folder: true, themes, warnings }
 }

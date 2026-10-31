@@ -25,6 +25,7 @@ accepts, and repairs anything that Orca's contrast check would drop.
 | `--license-file` | The upstream license to copy to `LICENSE`. Defaults to a `LICENSE` file next to the theme. |
 | `--source-url` | Upstream `https` link for the README's attribution. |
 | `--theme` | For an extension folder, convert only the themes with this label. Repeatable. |
+| `--title` | `<VS Code label>=<title>`: retitle a theme. Theme ids derive from titles, so use it to keep an updated plugin's ids. Repeatable. |
 
 The tool writes into a new or empty folder and never overwrites. If Orca's validator rejects
 the result, it exits 2 and leaves the files in place.
