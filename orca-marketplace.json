@@ -3,6 +3,19 @@
   "owner": "stablyai",
   "plugins": [
     {
+      "id": "senadaruc.grazr",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/senadaruc/orca-grazr.git",
+        "ref": "main"
+      },
+      "description": "Rotates the System default Claude Code account on each of your hosts before the 5-hour or weekly limit hits, using the grazr engine. A sidebar panel shows every account as a dial, clock or list.",
+      "categories": [
+        "ai",
+        "productivity"
+      ]
+    },
+    {
       "id": "stablyai.orca-midnight-theme",
       "source": {
         "kind": "git",
@@ -10,7 +23,10 @@
         "ref": "v1.0.0"
       },
       "description": "A quiet dark theme tuned for long coding sessions.",
-      "categories": ["themes", "official"]
+      "categories": [
+        "themes",
+        "official"
+      ]
     },
     {
       "id": "stablyai.orca-workflow-skills",
@@ -20,7 +36,10 @@
         "ref": "v1.0.0"
       },
       "description": "Practical skills for planning, reviewing, and handing off repository work.",
-      "categories": ["skills", "official"]
+      "categories": [
+        "skills",
+        "official"
+      ]
     },
     {
       "id": "stablyai.orca-nord-theme",
@@ -30,7 +49,10 @@
         "ref": "v1.0.0"
       },
       "description": "A cool, low-contrast application theme inspired by arctic colors.",
-      "categories": ["themes", "official"]
+      "categories": [
+        "themes",
+        "official"
+      ]
     },
     {
       "id": "stablyai.orca-minimal-icons",
@@ -40,7 +62,10 @@
         "ref": "v1.0.0"
       },
       "description": "A compact monochrome icon theme for common source files.",
-      "categories": ["icons", "official"]
+      "categories": [
+        "icons",
+        "official"
+      ]
     },
     {
       "id": "stablyai.orca-solarized-terminal",
@@ -50,7 +75,10 @@
         "ref": "v1.0.0"
       },
       "description": "Solarized Dark terminal colors packaged for Orca.",
-      "categories": ["terminal-themes", "official"]
+      "categories": [
+        "terminal-themes",
+        "official"
+      ]
     },
     {
       "id": "stablyai.orca-multipass-recipes",
@@ -60,7 +88,10 @@
         "ref": "v1.0.0"
       },
       "description": "A reviewed starter lifecycle for disposable Multipass workspaces.",
-      "categories": ["vm-recipes", "official"]
+      "categories": [
+        "vm-recipes",
+        "official"
+      ]
     },
     {
       "id": "stablyai.orca-navigation-shortcuts",
@@ -70,7 +101,10 @@
         "ref": "v1.0.0"
       },
       "description": "Command aliases and optional shortcuts for frequent Orca views.",
-      "categories": ["keybindings", "official"]
+      "categories": [
+        "keybindings",
+        "official"
+      ]
     }
   ]
 }

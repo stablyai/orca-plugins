@@ -2109,6 +2109,141 @@
           }
         }
       ]
+    },
+    {
+      "id": "senadaruc.grazr",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/senadaruc/orca-grazr.git",
+        "ref": "main"
+      },
+      "description": "Rotates the System default Claude Code account on each of your hosts before the 5-hour or weekly limit hits, using the grazr engine. A sidebar panel shows every account as a dial, clock or list.",
+      "categories": [
+        "ai",
+        "productivity"
+      ],
+      "releases": [
+        {
+          "version": "0.6.9",
+          "commit": "ebf1b1895aa1d8142eed521443d20bb2794d87c8",
+          "contentHash": "f7cd0daa2ceab45d1eb34e8d99eef0730b7f0300f571cc969674e721fb3c2764",
+          "execution": "trusted-worker",
+          "minimumOrca": "1.4.245",
+          "name": "Grazr",
+          "contributes": [
+            {
+              "kind": "panels",
+              "name": "Claude Accounts"
+            },
+            {
+              "kind": "commands",
+              "name": "Grazr: Target → next host"
+            },
+            {
+              "kind": "commands",
+              "name": "Grazr: Status (all hosts)"
+            },
+            {
+              "kind": "commands",
+              "name": "Grazr: Swap now (target)"
+            },
+            {
+              "kind": "commands",
+              "name": "Grazr: Refresh parked accounts (target)"
+            },
+            {
+              "kind": "commands",
+              "name": "Grazr: Toggle rotation (target)"
+            },
+            {
+              "kind": "commands",
+              "name": "Grazr: Install engine on target"
+            },
+            {
+              "kind": "commands",
+              "name": "Grazr: Uninstall from target"
+            },
+            {
+              "kind": "commands",
+              "name": "Grazr: Drain notices now"
+            },
+            {
+              "kind": "commands",
+              "name": "Grazr: Type enrol command into terminal"
+            },
+            {
+              "kind": "commands",
+              "name": "Grazr: Type status command into terminal"
+            },
+            {
+              "kind": "commands",
+              "name": "Grazr: Refresh panel"
+            },
+            {
+              "kind": "commands",
+              "name": "Grazr: Show the focused workspace's host"
+            },
+            {
+              "kind": "events",
+              "name": "agent.status.changed"
+            },
+            {
+              "kind": "events",
+              "name": "workspace.created"
+            }
+          ],
+          "capabilities": [
+            "notifications:show",
+            "settings:own",
+            "storage:own",
+            "workspace:read",
+            "agent:read",
+            "terminal:send"
+          ],
+          "license": "MIT",
+          "repository": "https://github.com/senadaruc/orca-grazr",
+          "updatedAt": "2026-10-31",
+          "images": {
+            "icon": {
+              "path": "assets/senadaruc.grazr/icon.png",
+              "alt": "A four-colour ring with a needle, the Grazr dial",
+              "sha256": "08d3738ad861bb8418a38c483c038cabe7f6290c8f1369c41e178e566106db04",
+              "width": 256,
+              "height": 256
+            },
+            "cover": {
+              "path": "assets/senadaruc.grazr/cover.png",
+              "alt": "Grazr for Orca: the Claude Accounts panel as a dark dial and a light list",
+              "sha256": "b57fac5a3e7e77a8e22a4ce4beacb1bc352460e8325296705fdda0ac28e01a72",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/senadaruc.grazr/dial-dark.png",
+                "alt": "Dial face: each account's weekly window around the ring, with an inner Fable ring",
+                "sha256": "fe05ae239f81018149815e2c7a6ee731c4d41dd9064ebe089dd8a45161b630bc",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/senadaruc.grazr/list-dark.png",
+                "alt": "List face: per-window usage bars, plan chips and reading age per account",
+                "sha256": "2706f3754cb02e84953ee60c7649a05d889fbf8b12cb33d80d51973163acb3a6",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/senadaruc.grazr/clock-light.png",
+                "alt": "Clock face in the light theme: when each account runs out at the current pace",
+                "sha256": "caeba249cba9d89180567c38808b331c0fb6649dc3eb183e37ac99d747ec3f7f",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          }
+        }
+      ]
     }
   ]
 }
