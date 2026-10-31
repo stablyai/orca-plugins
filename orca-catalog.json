@@ -1777,7 +1777,42 @@
         "editors",
         "official"
       ],
-      "releases": []
+      "releases": [
+        {
+          "version": "1.0.0",
+          "commit": "f3f300dae4de33710542257636174b3688e2f6ab",
+          "contentHash": "cd92a5bee7458e840436ec7e2ebc82774c20cd23d314bfe5eda2eb1b175254b7",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.245",
+          "name": "Image Markup",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Markup",
+              "detail": ".png, .jpg, .jpeg, .webp, .gif, .bmp, .avif"
+            }
+          ],
+          "fileTypes": [
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "gif",
+            "bmp",
+            "avif"
+          ],
+          "editorFileTypes": [
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "gif",
+            "bmp",
+            "avif"
+          ],
+          "license": "MIT"
+        }
+      ]
     },
     {
       "id": "stablyai.orca-runner",
