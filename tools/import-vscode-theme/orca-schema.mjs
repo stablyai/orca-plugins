@@ -26,7 +26,10 @@ function probe(value) {
 
 /** Orca's built-in colors per base, from the `:root` and `.dark` blocks of its stylesheet. */
 function builtInColors(orcaDir, tokens) {
-  const css = readFileSync(path.join(orcaDir, 'src', 'renderer', 'src', 'assets', 'main.css'), 'utf8')
+  const css = readFileSync(
+    path.join(orcaDir, 'src', 'renderer', 'src', 'assets', 'main.css'),
+    'utf8'
+  ).replace(/\r\n/g, '\n')
   const block = (selector) => {
     const start = css.indexOf(`\n${selector} {\n`)
     const body = start === -1 ? '' : css.slice(start, css.indexOf('\n}', start))

@@ -110,13 +110,15 @@ function readingOf(token) {
 
 /** A token's color as painted: translucent ones over the opaque token beneath them. */
 function painted(token, tokens, depth = 0) {
-  const color = parseCssColor(tokens[token] ?? '')
+  // Why whole channels: Orca's check paints each color as one pixel before comparing.
+  const parsed = parseCssColor(tokens[token] ?? '')
+  const color = parsed ? parseHex(toHex(parsed)) : null
   if (!color || color[3] === 1 || depth > 4) {
     return color
   }
   const under = TRANSLUCENT_APP_THEME_TOKENS[token] ?? '--background'
   const base = painted(under, tokens, depth + 1) ?? parseCssColor(tokens['--background'] ?? '')
-  return base ? flatten(color, base) : null
+  return base ? parseHex(toHex(flatten(color, base))) : null
 }
 
 /** A readable color for `token` on every surface it is read on, closest to its current one. */
