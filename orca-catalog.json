@@ -1765,6 +1765,56 @@
       ]
     },
     {
+      "id": "stablyai.orca-image-markup",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-plugins.git",
+        "ref": "main",
+        "path": "plugins/image-markup"
+      },
+      "description": "Mark up images with pen, arrow, box and text tools. Copy the result, or save it into the image with the original kept inside and the markup still editable.",
+      "categories": [
+        "editors",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "1.0.0",
+          "commit": "f3f300dae4de33710542257636174b3688e2f6ab",
+          "contentHash": "cd92a5bee7458e840436ec7e2ebc82774c20cd23d314bfe5eda2eb1b175254b7",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.245",
+          "name": "Image Markup",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Markup",
+              "detail": ".png, .jpg, .jpeg, .webp, .gif, .bmp, .avif"
+            }
+          ],
+          "fileTypes": [
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "gif",
+            "bmp",
+            "avif"
+          ],
+          "editorFileTypes": [
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "gif",
+            "bmp",
+            "avif"
+          ],
+          "license": "MIT"
+        }
+      ]
+    },
+    {
       "id": "stablyai.orca-runner",
       "source": {
         "kind": "git",
