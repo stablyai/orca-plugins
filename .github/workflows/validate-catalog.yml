@@ -50,6 +50,12 @@ jobs:
           pnpm install --frozen-lockfile --ignore-scripts
           pnpm run build:packages
 
+      - name: Test tools against Orca's validator and contrast check
+        working-directory: catalog
+        env:
+          ORCA_DIR: ${{ github.workspace }}/orca
+        run: node --test "tools/**/*.test.mjs"
+
       - name: Check plugins/ release entries are current
         working-directory: catalog
         env:

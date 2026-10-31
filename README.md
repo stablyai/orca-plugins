@@ -13,6 +13,7 @@ Plugins.
 | `assets/` | Listing images referenced by releases. |
 | `scripts/release-entry.mjs` | Prints and checks the catalog release of every plugin in `plugins/`. |
 | `scripts/check-catalog.mjs` | Validates the catalog, every release, images and `orca-marketplace.json`. |
+| `tools/import-vscode-theme/` | Converts a VS Code color theme into an Orca theme plugin. See its [README](tools/import-vscode-theme/README.md). |
 
 ## Official plugins
 
