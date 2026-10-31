@@ -38,6 +38,7 @@ Plugins.
 | systemd Unit Files | `plugins/systemd` | Highlighting for systemd units and Podman Quadlet files |
 | Excalidraw | `plugins/excalidraw` | An editor for `.excalidraw` diagrams |
 | Word Document Viewer | `plugins/docx` | Read-only `.docx` pages with headers, footers, images and zoom |
+| Image Markup | `plugins/image-markup` | Pen, arrow, box and text markup on images, saved editably into the file |
 | Multipass VM Recipes | `plugins/multipass-recipes` | Disposable Multipass VM workspaces |
 
 Community plugins live in their authors' own repositories. The catalog can list them, but their
