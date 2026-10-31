@@ -1,5 +1,5 @@
-// Runs before Excalidraw loads. The editor frame has an opaque origin, where Web Storage throws,
-// and no asset server, so Excalidraw must never resolve a URL of its own.
+// Runs before Excalidraw loads, in a srcdoc frame: an opaque origin, where Web Storage throws, and
+// a CSP that allows only inline code and data: fonts and images, so Excalidraw must never fetch.
 
 function memoryStorage() {
   const items = new Map()

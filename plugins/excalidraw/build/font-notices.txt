@@ -1,5 +1,5 @@
-Fonts embedded in editor/index.html (from @excalidraw/excalidraw 0.18.1). The CJK font Xiaolai and
-Liberation Sans are not embedded.
+Fonts in editor/assets/fonts (from @excalidraw/excalidraw 0.18.1). The CJK font Xiaolai and
+Liberation Sans are not included.
 
 Excalifont
   Copyright (c) 2024 by Excalidraw. Excalifont is a trademark of Excalidraw.

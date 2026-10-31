@@ -1,0 +1,18 @@
+html, body, #root { height: 100%; margin: 0; overflow: hidden; }
+body { background: var(--orca-background, transparent); }
+.orca-excalidraw-message { box-sizing: border-box; display: flex; height: 100%; align-items: center;
+  justify-content: center; padding: 24px; text-align: center; font: 13px/1.5 system-ui, sans-serif;
+  color: var(--orca-muted-foreground, #737373); background: var(--orca-background, transparent); }
+/* Its library browser is an external site, which neither frame can reach. */
+.library-menu-browse-button { display: none !important; }
+/* A srcdoc frame keeps the library only in memory, so it stays hidden there. */
+.orca-excalidraw-srcdoc .default-sidebar-trigger { display: none !important; }
+.orca-excalidraw-save { position: fixed; z-index: 1000; left: 50%; bottom: 24px; transform: translateX(-50%);
+  display: flex; gap: 8px; align-items: center; padding: 8px 8px 8px 14px; border-radius: 8px;
+  font: 13px/1.4 system-ui, sans-serif; color: var(--orca-popover-foreground, #1b1b1f);
+  background: var(--orca-popover, #ffffff); border: 1px solid var(--orca-border, #d0d0d7);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2); }
+.orca-excalidraw-save button { font: inherit; padding: 4px 12px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--orca-border, #d0d0d7); color: inherit; background: transparent; }
+.orca-excalidraw-save button:first-of-type { color: var(--orca-primary-foreground, #ffffff);
+  background: var(--orca-primary, #6965db); border-color: transparent; }
