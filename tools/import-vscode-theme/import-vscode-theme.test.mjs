@@ -205,6 +205,15 @@ describe('VS Code theme import', () => {
     assert.ok(!('--border' in tokens))
     // Colors the theme never set stay Orca's own, such as the status hues.
     assert.ok(!Object.keys(tokens).some((token) => token.startsWith('--git-decoration-')))
+    // A derived muted text right at 4.5:1 must pass after Orca rounds each channel.
+    const edge = folder({
+      'theme.json': JSON.stringify({
+        type: 'dark',
+        colors: { 'editor.background': '#000000', 'editor.foreground': '#a6a6a6' }
+      })
+    })
+    const edgePlugin = renderThemePlugin(readVscodeThemes(path.join(edge, 'theme.json')), identity, real)
+    assert.ok(!edgePlugin.warnings.some((warning) => warning.includes('still drops')))
   })
 
   it('refuses an include outside the imported folder', () => {

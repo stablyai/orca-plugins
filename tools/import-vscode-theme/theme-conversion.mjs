@@ -131,7 +131,7 @@ function readableFor(token, tokens) {
   }
   const away = isLightColor(surfaces[0]) ? [0, 0, 0, 1] : [255, 255, 255, 1]
   for (const toward of [away, [0, 0, 0, 1], [255, 255, 255, 1]]) {
-    for (let percent = 0; percent <= 100; percent += 5) {
+    for (let percent = 0; percent <= 100; percent += 1) {
       // Why the written hex: rounding can push a borderline color under the floor.
       const hex = toHex(blend(current, toward, percent))
       const written = parseHex(hex)
