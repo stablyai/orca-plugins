@@ -162,12 +162,14 @@ if (!license) {
 
 // Why: titles come from untrusted theme files and land in Markdown.
 const plain = (text) => text.replace(/[[\]()<>*_`\\]/g, '')
-const upstream = flags['source-url'] ? `[${plain(name)}](${flags['source-url']})` : plain(name)
+const upstreamName = plain(set.name ?? name)
+const upstream = flags['source-url'] ? `[${upstreamName}](${flags['source-url']})` : upstreamName
+const hasTerminalThemes = Object.keys(files).some((file) => file.startsWith('terminal/'))
 files['README.md'] = `# ${plain(name)}
 
 ${set.themes.map((theme) => `- ${plain(theme.label)} (${theme.base})`).join('\n')}
 
-Choose a theme under Settings → Appearance; its terminal colors are offered alongside it.
+Choose a theme under Settings → Appearance${hasTerminalThemes ? '; its terminal colors are offered alongside it' : ''}.
 
 ## Attribution
 

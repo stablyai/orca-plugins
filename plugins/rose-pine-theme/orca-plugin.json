@@ -1,0 +1,51 @@
+{
+  "manifestVersion": 2,
+  "id": "orca-rose-pine-theme",
+  "publisher": "stablyai",
+  "name": "Rosé Pine for Orca",
+  "version": "1.0.0",
+  "execution": "data",
+  "description": "All natural pine, faux fur and a bit of soho vibes: Rosé Pine and Moon for dark mode, Dawn for light mode.",
+  "license": "MIT",
+  "repository": "https://github.com/stablyai/orca-plugins/tree/main/plugins/rose-pine-theme",
+  "engines": {
+    "orca": ">=1.4.245"
+  },
+  "contributes": {
+    "themes": [
+      {
+        "id": "rose-pine",
+        "title": "Rosé Pine",
+        "path": "themes/rose-pine.json"
+      },
+      {
+        "id": "rose-pine-moon",
+        "title": "Rosé Pine Moon",
+        "path": "themes/rose-pine-moon.json"
+      },
+      {
+        "id": "rose-pine-dawn",
+        "title": "Rosé Pine Dawn",
+        "path": "themes/rose-pine-dawn.json"
+      }
+    ],
+    "terminalThemes": [
+      {
+        "id": "rose-pine",
+        "title": "Rosé Pine",
+        "path": "terminal/rose-pine.json"
+      },
+      {
+        "id": "rose-pine-moon",
+        "title": "Rosé Pine Moon",
+        "path": "terminal/rose-pine-moon.json"
+      },
+      {
+        "id": "rose-pine-dawn",
+        "title": "Rosé Pine Dawn",
+        "path": "terminal/rose-pine-dawn.json"
+      }
+    ]
+  },
+  "capabilities": []
+}

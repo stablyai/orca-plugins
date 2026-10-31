@@ -1,0 +1,51 @@
+{
+  "manifestVersion": 2,
+  "id": "orca-ayu-theme",
+  "publisher": "stablyai",
+  "name": "Ayu for Orca",
+  "version": "1.0.0",
+  "execution": "data",
+  "description": "Simple, bright and elegant: Ayu Light, Mirage and Dark app themes with matching code and terminal colors.",
+  "license": "MIT",
+  "repository": "https://github.com/stablyai/orca-plugins/tree/main/plugins/ayu-theme",
+  "engines": {
+    "orca": ">=1.4.245"
+  },
+  "contributes": {
+    "themes": [
+      {
+        "id": "ayu-light",
+        "title": "Ayu Light",
+        "path": "themes/ayu-light.json"
+      },
+      {
+        "id": "ayu-mirage",
+        "title": "Ayu Mirage",
+        "path": "themes/ayu-mirage.json"
+      },
+      {
+        "id": "ayu-dark",
+        "title": "Ayu Dark",
+        "path": "themes/ayu-dark.json"
+      }
+    ],
+    "terminalThemes": [
+      {
+        "id": "ayu-light",
+        "title": "Ayu Light",
+        "path": "terminal/ayu-light.json"
+      },
+      {
+        "id": "ayu-mirage",
+        "title": "Ayu Mirage",
+        "path": "terminal/ayu-mirage.json"
+      },
+      {
+        "id": "ayu-dark",
+        "title": "Ayu Dark",
+        "path": "terminal/ayu-dark.json"
+      }
+    ]
+  },
+  "capabilities": []
+}

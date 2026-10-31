@@ -1,0 +1,41 @@
+{
+  "manifestVersion": 2,
+  "id": "orca-night-owl-theme",
+  "publisher": "stablyai",
+  "name": "Night Owl for Orca",
+  "version": "1.0.0",
+  "execution": "data",
+  "description": "Sarah Drasner's Night Owl, tuned for late-night coding, and its Light Owl daytime companion.",
+  "license": "MIT",
+  "repository": "https://github.com/stablyai/orca-plugins/tree/main/plugins/night-owl-theme",
+  "engines": {
+    "orca": ">=1.4.245"
+  },
+  "contributes": {
+    "themes": [
+      {
+        "id": "night-owl",
+        "title": "Night Owl",
+        "path": "themes/night-owl.json"
+      },
+      {
+        "id": "night-owl-light",
+        "title": "Night Owl Light",
+        "path": "themes/night-owl-light.json"
+      }
+    ],
+    "terminalThemes": [
+      {
+        "id": "night-owl",
+        "title": "Night Owl",
+        "path": "terminal/night-owl.json"
+      },
+      {
+        "id": "night-owl-light",
+        "title": "Night Owl Light",
+        "path": "terminal/night-owl-light.json"
+      }
+    ]
+  },
+  "capabilities": []
+}

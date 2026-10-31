@@ -2011,7 +2011,7 @@
       "releases": [
         {
           "version": "1.1.0",
-          "commit": "2af9a96f902e616e0f200f7ff7a91c69c8ebd66c",
+          "commit": "a501d84f15f796248f12678fd92e1f22e50bead4",
           "contentHash": "21f2dcecf215f92cb122732143a7d511433c7eb729deb8e588ba5a27a48b1aec",
           "execution": "data",
           "minimumOrca": "1.4.245",
@@ -2144,6 +2144,750 @@
               }
             ]
           }
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-tokyo-night-theme",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-plugins.git",
+        "ref": "main",
+        "path": "plugins/tokyo-night-theme"
+      },
+      "description": "Tokyo Night, Tokyo Night Storm and Tokyo Night Light app themes with matching code and terminal colors.",
+      "categories": [
+        "themes",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "1.0.0",
+          "commit": "3ad7e2c36acf9fabb4148b99359dca95d345ba4c",
+          "contentHash": "8beb4aca05752043699aadaee9b332280c0cb06f75371711ab2edc134b6e81f7",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "Tokyo Night for Orca",
+          "contributes": [
+            {
+              "kind": "themes",
+              "name": "Tokyo Night"
+            },
+            {
+              "kind": "themes",
+              "name": "Tokyo Night Storm"
+            },
+            {
+              "kind": "themes",
+              "name": "Tokyo Night Light"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "Tokyo Night"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "Tokyo Night Storm"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "Tokyo Night Light"
+            }
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-tokyo-night-theme/tokyo-night.png",
+              "alt": "Tokyo Night in Orca: a TypeScript file and its diff above a terminal showing git status and the 16 terminal colors",
+              "sha256": "8dc88528274f7741f95fb15c87ca918add69f8be3148abeb08e635266e473e1f",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/orca-tokyo-night-theme/tokyo-night-storm.png",
+                "alt": "Tokyo Night Storm in Orca: the same file, diff and terminal",
+                "sha256": "8268b50b308df3773250925538ae1d41ed3846d92004a3d7356dbb6d8cfe080c",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-tokyo-night-theme/tokyo-night-light.png",
+                "alt": "Tokyo Night Light in Orca: the same file, diff and terminal",
+                "sha256": "b2945739c293ebf28d4f0c01f22e1e9f15398bbdf6c25f0087ade530d56e2c90",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "themePreview": [
+            {
+              "label": "Tokyo Night",
+              "base": "dark",
+              "background": "#1a1b26",
+              "foreground": "#a9b1d6",
+              "accent": "#7aa2f7",
+              "surface": "#16161e"
+            },
+            {
+              "label": "Tokyo Night Storm",
+              "base": "dark",
+              "background": "#24283b",
+              "foreground": "#a9b1d6",
+              "accent": "#7aa2f7",
+              "surface": "#1f2335"
+            },
+            {
+              "label": "Tokyo Night Light",
+              "base": "light",
+              "background": "#e6e7ed",
+              "foreground": "#343b59",
+              "accent": "#2959aa",
+              "surface": "#d6d8df"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-one-dark-pro-theme",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-plugins.git",
+        "ref": "main",
+        "path": "plugins/one-dark-pro-theme"
+      },
+      "description": "Atom's iconic One Dark, in the One Dark Pro, Darker and Flat variants, with matching code and terminal colors.",
+      "categories": [
+        "themes",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "1.0.0",
+          "commit": "3ad7e2c36acf9fabb4148b99359dca95d345ba4c",
+          "contentHash": "4dcabfaea6b2e3051a8b16510a48f18ce560e4027034f00180e6adc98800b54f",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "One Dark Pro for Orca",
+          "contributes": [
+            {
+              "kind": "themes",
+              "name": "One Dark Pro"
+            },
+            {
+              "kind": "themes",
+              "name": "One Dark Pro Flat"
+            },
+            {
+              "kind": "themes",
+              "name": "One Dark Pro Darker"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "One Dark Pro"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "One Dark Pro Flat"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "One Dark Pro Darker"
+            }
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-one-dark-pro-theme/one-dark-pro.png",
+              "alt": "One Dark Pro in Orca: a TypeScript file and its diff above a terminal showing git status and the 16 terminal colors",
+              "sha256": "3e2305691fbc296c2914e3416235119a3f3b75d606e0d43c94b97623caa692e4",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/orca-one-dark-pro-theme/one-dark-pro-darker.png",
+                "alt": "One Dark Pro Darker in Orca: the same file, diff and terminal",
+                "sha256": "223cb14ca9afad1fe72a0ddfee9a2f379b57ce19188984e7bd0783b390ee4c31",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-one-dark-pro-theme/one-dark-pro-flat.png",
+                "alt": "One Dark Pro Flat in Orca: the same file, diff and terminal",
+                "sha256": "10582c4daeb61cde06b11c0bd50c80c9a5647875995139e9747093ff45c0df17",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "themePreview": [
+            {
+              "label": "One Dark Pro",
+              "base": "dark",
+              "background": "#282c34",
+              "foreground": "#abb2bf",
+              "accent": "#404754",
+              "surface": "#21252b"
+            },
+            {
+              "label": "One Dark Pro Darker",
+              "base": "dark",
+              "background": "#23272e",
+              "foreground": "#abb2bf",
+              "accent": "#404754",
+              "surface": "#1e2227"
+            },
+            {
+              "label": "One Dark Pro Flat",
+              "base": "dark",
+              "background": "#282c34",
+              "foreground": "#abb2bf",
+              "accent": "#404754",
+              "surface": "#282c34"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-rose-pine-theme",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-plugins.git",
+        "ref": "main",
+        "path": "plugins/rose-pine-theme"
+      },
+      "description": "All natural pine, faux fur and a bit of soho vibes: Rosé Pine and Moon for dark mode, Dawn for light mode.",
+      "categories": [
+        "themes",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "1.0.0",
+          "commit": "3ad7e2c36acf9fabb4148b99359dca95d345ba4c",
+          "contentHash": "4d1695e39f6af26ea34f6746142321263e907dc1d673019ead68f1a436386c62",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "Rosé Pine for Orca",
+          "contributes": [
+            {
+              "kind": "themes",
+              "name": "Rosé Pine"
+            },
+            {
+              "kind": "themes",
+              "name": "Rosé Pine Moon"
+            },
+            {
+              "kind": "themes",
+              "name": "Rosé Pine Dawn"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "Rosé Pine"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "Rosé Pine Moon"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "Rosé Pine Dawn"
+            }
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-rose-pine-theme/rose-pine.png",
+              "alt": "Rosé Pine in Orca: a TypeScript file and its diff above a terminal showing git status and the 16 terminal colors",
+              "sha256": "51bca6e96759f842c886d4fd0da4c0ed2f31863d403bffa6b48af8245322917b",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/orca-rose-pine-theme/rose-pine-moon.png",
+                "alt": "Rosé Pine Moon in Orca: the same file, diff and terminal",
+                "sha256": "dd1fee986ff548210270367424c4828f2d6ff944cfcda2a8889b190eccc6f2ba",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-rose-pine-theme/rose-pine-dawn.png",
+                "alt": "Rosé Pine Dawn in Orca: the same file, diff and terminal",
+                "sha256": "e2c2ae500be8942ebf6149828721bebe41152647bf3eb338a9936660adb7a05d",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "themePreview": [
+            {
+              "label": "Rosé Pine",
+              "base": "dark",
+              "background": "#191724",
+              "foreground": "#e0def4",
+              "accent": "#9ccfd8",
+              "surface": "#191724"
+            },
+            {
+              "label": "Rosé Pine Moon",
+              "base": "dark",
+              "background": "#232136",
+              "foreground": "#e0def4",
+              "accent": "#9ccfd8",
+              "surface": "#232136"
+            },
+            {
+              "label": "Rosé Pine Dawn",
+              "base": "light",
+              "background": "#faf4ed",
+              "foreground": "#575279",
+              "accent": "#56949f",
+              "surface": "#faf4ed"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-github-vscode-theme",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-plugins.git",
+        "ref": "main",
+        "path": "plugins/github-vscode-theme"
+      },
+      "description": "GitHub's own VS Code themes: Light Default, Dark Default, Dark Dimmed and the high-contrast variants.",
+      "categories": [
+        "themes",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "1.0.0",
+          "commit": "3ad7e2c36acf9fabb4148b99359dca95d345ba4c",
+          "contentHash": "7e17af8557dd0163ee0bc74aca3a6eb227f00bdd4b2ca04a68d78d891a24afb3",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "GitHub Themes for Orca",
+          "contributes": [
+            {
+              "kind": "themes",
+              "name": "GitHub Light Default"
+            },
+            {
+              "kind": "themes",
+              "name": "GitHub Light High Contrast"
+            },
+            {
+              "kind": "themes",
+              "name": "GitHub Dark Default"
+            },
+            {
+              "kind": "themes",
+              "name": "GitHub Dark High Contrast"
+            },
+            {
+              "kind": "themes",
+              "name": "GitHub Dark Dimmed"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "GitHub Light Default"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "GitHub Light High Contrast"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "GitHub Dark Default"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "GitHub Dark High Contrast"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "GitHub Dark Dimmed"
+            }
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-github-vscode-theme/github-dark-default.png",
+              "alt": "GitHub Dark Default in Orca: a TypeScript file and its diff above a terminal showing git status and the 16 terminal colors",
+              "sha256": "aadaad6d9521b36da82a664b27fbdaf9898f02b3fa241b2e7b73c31882c2a028",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/orca-github-vscode-theme/github-light-default.png",
+                "alt": "GitHub Light Default in Orca: the same file, diff and terminal",
+                "sha256": "7a5a5ca29ecaae681baaf991c07030c62cb2a708f0199287fffb312f716fe18e",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-github-vscode-theme/github-dark-dimmed.png",
+                "alt": "GitHub Dark Dimmed in Orca: the same file, diff and terminal",
+                "sha256": "5f03b2fcb834b33221e2597613f6e848c5ec68e9ed01aba5a257ec63c49eec92",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-github-vscode-theme/github-light-high-contrast.png",
+                "alt": "GitHub Light High Contrast in Orca: the same file, diff and terminal",
+                "sha256": "e1b6f182206b8a0465f981ee34c81cc678ca410326e0ed341197d68d2ebca9e1",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-github-vscode-theme/github-dark-high-contrast.png",
+                "alt": "GitHub Dark High Contrast in Orca: the same file, diff and terminal",
+                "sha256": "493a38512f086cddf8e0ca9b31229c296e2dbdf96e65035d6310374c816a7555",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "themePreview": [
+            {
+              "label": "GitHub Dark Default",
+              "base": "dark",
+              "background": "#0d1117",
+              "foreground": "#e6edf3",
+              "accent": "#238636",
+              "surface": "#010409"
+            },
+            {
+              "label": "GitHub Light Default",
+              "base": "light",
+              "background": "#ffffff",
+              "foreground": "#1f2328",
+              "accent": "#1f883d",
+              "surface": "#f6f8fa"
+            },
+            {
+              "label": "GitHub Dark Dimmed",
+              "base": "dark",
+              "background": "#22272e",
+              "foreground": "#adbac7",
+              "accent": "#347d39",
+              "surface": "#1c2128"
+            },
+            {
+              "label": "GitHub Light High Contrast",
+              "base": "light",
+              "background": "#ffffff",
+              "foreground": "#0e1116",
+              "accent": "#055d20",
+              "surface": "#ffffff"
+            },
+            {
+              "label": "GitHub Dark High Contrast",
+              "base": "dark",
+              "background": "#0a0c10",
+              "foreground": "#f0f3f6",
+              "accent": "#09b43a",
+              "surface": "#010409"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-ayu-theme",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-plugins.git",
+        "ref": "main",
+        "path": "plugins/ayu-theme"
+      },
+      "description": "Simple, bright and elegant: Ayu Light, Mirage and Dark app themes with matching code and terminal colors.",
+      "categories": [
+        "themes",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "1.0.0",
+          "commit": "3ad7e2c36acf9fabb4148b99359dca95d345ba4c",
+          "contentHash": "d6905874d692a152d91b9adcb507bcf6f82bf9b941e3e70ab7fca7a009099dc7",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "Ayu for Orca",
+          "contributes": [
+            {
+              "kind": "themes",
+              "name": "Ayu Light"
+            },
+            {
+              "kind": "themes",
+              "name": "Ayu Mirage"
+            },
+            {
+              "kind": "themes",
+              "name": "Ayu Dark"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "Ayu Light"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "Ayu Mirage"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "Ayu Dark"
+            }
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-ayu-theme/ayu-mirage.png",
+              "alt": "Ayu Mirage in Orca: a TypeScript file and its diff above a terminal showing git status and the 16 terminal colors",
+              "sha256": "17c7ce694d4f6aaf7b5ff902c524864dfadbdcd006d0a37c31172077f2efd5a7",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/orca-ayu-theme/ayu-light.png",
+                "alt": "Ayu Light in Orca: the same file, diff and terminal",
+                "sha256": "061cd0cbb434268186cbb6163697e78af15a0c726241404fb51e27c53d813df6",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-ayu-theme/ayu-dark.png",
+                "alt": "Ayu Dark in Orca: the same file, diff and terminal",
+                "sha256": "b90ddf453132990d62d20d8444bf12f0c4cc606f402821ba76538425e4a18d76",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "themePreview": [
+            {
+              "label": "Ayu Mirage",
+              "base": "dark",
+              "background": "#242936",
+              "foreground": "#cccac2",
+              "accent": "#ffcc66",
+              "surface": "#1f2430"
+            },
+            {
+              "label": "Ayu Light",
+              "base": "light",
+              "background": "#fcfcfc",
+              "foreground": "#5c6166",
+              "accent": "#f29718",
+              "surface": "#f8f9fa"
+            },
+            {
+              "label": "Ayu Dark",
+              "base": "dark",
+              "background": "#10141c",
+              "foreground": "#bfbdb6",
+              "accent": "#e6b450",
+              "surface": "#0d1017"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-night-owl-theme",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-plugins.git",
+        "ref": "main",
+        "path": "plugins/night-owl-theme"
+      },
+      "description": "Sarah Drasner's Night Owl, tuned for late-night coding, and its Light Owl daytime companion.",
+      "categories": [
+        "themes",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "1.0.0",
+          "commit": "3ad7e2c36acf9fabb4148b99359dca95d345ba4c",
+          "contentHash": "a6527b65a853f5a16625e0c1b1dbcdad2421e06b10f63bd0cabee4e9699c3d12",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "Night Owl for Orca",
+          "contributes": [
+            {
+              "kind": "themes",
+              "name": "Night Owl"
+            },
+            {
+              "kind": "themes",
+              "name": "Night Owl Light"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "Night Owl"
+            },
+            {
+              "kind": "terminalThemes",
+              "name": "Night Owl Light"
+            }
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-night-owl-theme/night-owl.png",
+              "alt": "Night Owl in Orca: a TypeScript file and its diff above a terminal showing git status and the 16 terminal colors",
+              "sha256": "3fa96a073351d17375b0088781ee2e77ef71718e0ae9ee85a45f871758770b92",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/orca-night-owl-theme/night-owl-light.png",
+                "alt": "Night Owl Light in Orca: the same file, diff and terminal",
+                "sha256": "e407d386782a26e7d4db955bc3bfaa91bff020f3be1b80d7d3dc39afba14747b",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "themePreview": [
+            {
+              "label": "Night Owl",
+              "base": "dark",
+              "background": "#011627",
+              "foreground": "#d6deeb",
+              "accent": "#654aa3",
+              "surface": "#011627"
+            },
+            {
+              "label": "Night Owl Light",
+              "base": "light",
+              "background": "#fbfbfb",
+              "foreground": "#403f53",
+              "accent": "#2aa298",
+              "surface": "#f0f0f0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-vscode-default-themes",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-plugins.git",
+        "ref": "main",
+        "path": "plugins/vscode-default-themes"
+      },
+      "description": "Unofficial ports of VS Code's default color themes: Dark Modern, Light Modern, Dark+ and Light+.",
+      "categories": [
+        "themes",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "1.0.0",
+          "commit": "3ad7e2c36acf9fabb4148b99359dca95d345ba4c",
+          "contentHash": "ce11b29f4c21bedeaa3613e7ce9c4a6863f800e6945754ad1e36d04e24991139",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "VS Code Default Themes for Orca",
+          "contributes": [
+            {
+              "kind": "themes",
+              "name": "VS Code Dark+"
+            },
+            {
+              "kind": "themes",
+              "name": "VS Code Dark Modern"
+            },
+            {
+              "kind": "themes",
+              "name": "VS Code Light+"
+            },
+            {
+              "kind": "themes",
+              "name": "VS Code Light Modern"
+            }
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-vscode-default-themes/vs-code-dark-modern.png",
+              "alt": "VS Code Dark Modern in Orca: a TypeScript file and its diff above a terminal showing git status and the 16 terminal colors",
+              "sha256": "332ab0bb4b2d9b638a68b341a291f6f0d6e1d187bb990b0fe16ba24d73803fad",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/orca-vscode-default-themes/vs-code-light-modern.png",
+                "alt": "VS Code Light Modern in Orca: the same file, diff and terminal",
+                "sha256": "cfe0a0a34d0b503b00fce34441d3b0a4368f577317e0efd563ef64276dc6c55d",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-vscode-default-themes/vs-code-dark.png",
+                "alt": "VS Code Dark+ in Orca: the same file, diff and terminal",
+                "sha256": "1803bbe86d4f9674654151c8e0d65e9646126771d5ca83d3a700cad00175d589",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-vscode-default-themes/vs-code-light.png",
+                "alt": "VS Code Light+ in Orca: the same file, diff and terminal",
+                "sha256": "0ecedf63664f568b52e5019cfd96b467e732a89194cabaa50babffbfff08aaf0",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "themePreview": [
+            {
+              "label": "VS Code Dark Modern",
+              "base": "dark",
+              "background": "#1f1f1f",
+              "foreground": "#cccccc",
+              "accent": "#0078d4",
+              "surface": "#181818"
+            },
+            {
+              "label": "VS Code Light Modern",
+              "base": "light",
+              "background": "#ffffff",
+              "foreground": "#3b3b3b",
+              "accent": "#005fb8",
+              "surface": "#f8f8f8"
+            },
+            {
+              "label": "VS Code Dark+",
+              "base": "dark",
+              "background": "#1e1e1e",
+              "foreground": "#d4d4d4",
+              "accent": "#d4d4d4",
+              "surface": "#1e1e1e"
+            },
+            {
+              "label": "VS Code Light+",
+              "base": "light",
+              "background": "#ffffff",
+              "foreground": "#000000",
+              "accent": "#000000",
+              "surface": "#ffffff"
+            }
+          ]
         }
       ]
     }
