@@ -10,9 +10,10 @@
 // `c` is a #rrggbb colour and `s` a stroke width. In memory each shape also has a numeric `id`.
 
 export const SCENE_VERSION = 1
-const MAX_SHAPES = 5000
-const MAX_POINTS = 200000
-const MAX_TEXT = 4000
+export const MAX_SHAPES = 5000
+export const MAX_POINTS = 200_000
+export const MAX_TEXT = 4000
+const MAX_TEXT_TOTAL = 20_000
 const TYPES = new Set(['pen', 'arrow', 'box', 'ellipse', 'text'])
 /** Shapes defined by two corners, which share handles and normalizing. */
 export const isBoxLike = (shape) => shape.t === 'box' || shape.t === 'ellipse'
@@ -229,32 +230,73 @@ const isSize = (n, max) => typeof n === 'number' && Number.isFinite(n) && n > 0 
 const isCoordinate = (n, limit) => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= limit
 
 /**
- * Shapes from stored JSON, with ids; drops anything malformed. Returns null when the scene is not
- * for an image of this size (the file was resized elsewhere), so the caller can ignore it.
+ * What a scene for a width×height image may hold. The editor refuses edits past these and the
+ * loader skips shapes past them, so anything the editor saves reopens intact, while a crafted
+ * file can't make every redraw stall. Generous next to what the tools make: the thickest stroke
+ * is about 1/125 of the image's shorter side and the largest text about 1/23 of it.
+ */
+export function sceneLimits(width, height) {
+  const side = Math.max(width, height)
+  return { coordinate: side * 64 + 100_000, stroke: Math.max(64, side / 16), textSize: Math.max(64, side / 2) }
+}
+
+function shapeFits(shape, limits) {
+  if (!shape || !TYPES.has(shape.t) || !isColor(shape.c)) return false
+  if (shape.t === 'text') {
+    return (
+      typeof shape.text === 'string' &&
+      shape.text.length > 0 &&
+      shape.text.length <= MAX_TEXT &&
+      isSize(shape.z, limits.textSize) &&
+      isCoordinate(shape.x, limits.coordinate) &&
+      isCoordinate(shape.y, limits.coordinate)
+    )
+  }
+  const p = shape.p
+  if (!isSize(shape.s, limits.stroke) || !Array.isArray(p) || p.length < 2 || p.length % 2 !== 0) return false
+  if (shape.t !== 'pen' && p.length !== 4) return false
+  return p.every((n) => isCoordinate(n, limits.coordinate))
+}
+
+/** Whether the editor may keep `shapes`; only shapes not in `known` are checked one by one. */
+export function sceneFits(shapes, width, height, known = new Set()) {
+  if (shapes.length > MAX_SHAPES) return false
+  const limits = sceneLimits(width, height)
+  let points = 0
+  let text = 0
+  for (const shape of shapes) {
+    if (!known.has(shape) && !shapeFits(shape, limits)) return false
+    if (shape.t === 'text') text += shape.text.length
+    else points += shape.p.length / 2
+  }
+  return points <= MAX_POINTS && text <= MAX_TEXT_TOTAL
+}
+
+/**
+ * Shapes from stored JSON, with ids; skips anything malformed or past the limits. Returns null
+ * when the scene is not for an image of this size (the file was resized elsewhere), so the caller
+ * can ignore it.
  */
 export function parseScene(raw, width, height) {
   if (!raw || raw.v !== SCENE_VERSION || raw.w !== width || raw.h !== height || !Array.isArray(raw.shapes)) {
     return null
   }
-  const limit = Math.max(width, height) * 4
-  const maxStroke = Math.max(width, height)
+  const limits = sceneLimits(width, height)
   let points = 0
+  let text = 0
   const shapes = []
-  for (const shape of raw.shapes.slice(0, MAX_SHAPES)) {
-    if (!shape || !TYPES.has(shape.t) || !isColor(shape.c)) continue
+  for (const shape of raw.shapes) {
+    if (shapes.length === MAX_SHAPES) break
+    if (!shapeFits(shape, limits)) continue
     if (shape.t === 'text') {
-      if (typeof shape.text !== 'string' || !shape.text || !isSize(shape.z, maxStroke)) continue
-      if (!isCoordinate(shape.x, limit) || !isCoordinate(shape.y, limit)) continue
-      shapes.push(withId({ t: 'text', c: shape.c, z: shape.z, x: shape.x, y: shape.y, text: shape.text.slice(0, MAX_TEXT) }))
+      if (text + shape.text.length > MAX_TEXT_TOTAL) continue
+      text += shape.text.length
+      shapes.push(withId({ t: 'text', c: shape.c, z: shape.z, x: shape.x, y: shape.y, text: shape.text }))
       continue
     }
-    const p = shape.p
-    if (!isSize(shape.s, maxStroke) || !Array.isArray(p) || p.length < 2 || p.length % 2 !== 0) continue
-    if (shape.t !== 'pen' && p.length !== 4) continue
-    if (!p.every((n) => isCoordinate(n, limit))) continue
-    points += p.length / 2
-    if (points > MAX_POINTS) break
-    shapes.push(withId({ t: shape.t, c: shape.c, s: shape.s, p: p.slice() }))
+    if (points + shape.p.length / 2 > MAX_POINTS) continue
+    points += shape.p.length / 2
+    shapes.push(withId({ t: shape.t, c: shape.c, s: shape.s, p: shape.p.slice() }))
   }
   return shapes
 }

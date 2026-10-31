@@ -67,7 +67,7 @@ const ORCA_SHIM = `(function () {
     if (m.kind === 'res') { var settle = pending.get(m.id); if (settle) { pending.delete(m.id); settle(m) } }
     else if (m.kind === 'evt' && m.event === 'editor.document') { latest = m.payload; emit('editor.document', m.payload) }
     else if (m.kind === 'evt') emit(m.event, m.payload)
-    else if (m.kind === 'req') Promise.all(emit(m.method, m.params)).then(function () { post({ kind: 'res', id: m.id, result: null }) })
+    else if (m.kind === 'req') Promise.all(emit(m.method, m.params)).then(function () { post({ kind: 'res', id: m.id, result: null }) }, function (e) { post({ kind: 'res', id: m.id, error: { code: 'action_failed', message: String(e && e.message || e) } }) })
   })
   post({ kind: 'evt', event: 'ready', payload: { protocol: 1 } })
 })()`
@@ -102,7 +102,7 @@ window.addEventListener('message', (event) => {
     if (!error) window.__edits.push({ baseVersion, bytes: new Uint8Array(content.bytes) })
     frame().postMessage(error ? { orca: 1, kind: 'res', id: m.id, error } : { orca: 1, kind: 'res', id: m.id, result: null }, '*')
   }
-  if (m && m.kind === 'res' && flushes.has(m.id)) { flushes.get(m.id)(); flushes.delete(m.id) }
+  if (m && m.kind === 'res' && flushes.has(m.id)) { flushes.get(m.id)(m.error ?? null); flushes.delete(m.id) }
 })
 window.__fromBase64 = (base64) => Uint8Array.from(atob(base64), (ch) => ch.charCodeAt(0))
 window.__toBase64 = (bytes) => {

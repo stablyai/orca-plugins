@@ -15,7 +15,9 @@ import {
   isBoxLike,
   moveShape,
   normalizeBox,
+  MAX_TEXT,
   parseScene,
+  sceneFits,
   serializeScene,
   shapeAt,
   shapeBounds,
@@ -26,13 +28,15 @@ import {
   textHalo,
   withId
 } from './scene.js'
-import { drawShape, drawShapes, fontFor, haloFor, measureText, renderFlattened } from './render.js'
+import { drawShape, fontFor, haloFor, measureText, penSegments, renderFlattened } from './render.js'
 import { fitView, toImage, toStage, zoomAt } from './view.js'
 import { ICONS } from './icons.js'
 
-const EDIT_DEBOUNCE_MS = 700
+// Short, so the encode for the latest stroke is usually done before ⌘S: Orca gives a flush 1 s.
+const EDIT_DEBOUNCE_MS = 350
 const HISTORY_LIMIT = 200
-const MAX_DOCUMENT_BYTES = 64 * 1024 * 1024
+// Orca's 64 MiB cap counts the whole message, so leave room for its envelope.
+const MAX_DOCUMENT_BYTES = 64 * 1024 * 1024 - 64 * 1024
 const HIT_SLOP = 6 // CSS pixels
 const HANDLE_SIZE = 8
 const MIPMAP_MIN_PIXELS = 4_000_000
@@ -40,6 +44,8 @@ const COMPOSITE_MAX_PIXELS = 16_000_000
 const COMPOSITE_SETTLE_MS = 140
 // Full-resolution renders need several buffers this size; 64 MP still covers 48 MP phone photos.
 const MAX_IMAGE_PIXELS = 64_000_000
+// Chromium's canvas limit per side; past it a canvas silently draws nothing.
+const MAX_CANVAS_SIDE = 32_767
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform)
 const SAVE_KEY = IS_MAC ? '⌘S' : 'Ctrl+S'
 const MOD = IS_MAC ? '⌘' : 'Ctrl+'
@@ -117,6 +123,9 @@ const s = {
   // Saving
   timer: undefined,
   committing: null,
+  urgent: false, // Orca is waiting on a flush: encode without yielding
+  lastGesture: 0, // last wheel zoom or pan, so encoding can wait for the gesture to end
+  awaitingDocument: false, // Orca refused an edit as stale; send again once its newer document arrives
   saveError: null,
   flatCache: null
 }
@@ -194,11 +203,10 @@ function imageTransform(ctx) {
 /** The bitmap to draw at `k` device pixels per image pixel: a downscaled copy when far out. */
 function imageSource(k) {
   if (k >= 0.5 || s.width * s.height < MIPMAP_MIN_PIXELS) return s.bitmap
-  for (let level = Math.min(4, Math.floor(Math.log2(1 / k))); level > 0; level--) {
-    const mip = s.mips[level]
-    if (mip instanceof ImageBitmap) return mip
-    if (!mip) buildMip(level)
-  }
+  const wanted = Math.min(4, Math.floor(Math.log2(1 / k)))
+  if (!s.mips[wanted]) buildMip(wanted)
+  // Until it is ready, the nearest larger copy that is.
+  for (let level = wanted; level > 0; level--) if (s.mips[level] instanceof ImageBitmap) return s.mips[level]
   return s.bitmap
 }
 
@@ -229,7 +237,7 @@ function paintBase() {
   const hidden = s.op?.hides ?? s.editing?.shape ?? null
   const width = Math.ceil(s.width * k)
   const height = Math.ceil(s.height * k)
-  if (width * height <= COMPOSITE_MAX_PIXELS) {
+  if (width * height <= COMPOSITE_MAX_PIXELS && width <= MAX_CANVAS_SIDE && height <= MAX_CANVAS_SIDE) {
     const layer = compositeLayer(k, hidden, width, height)
     // Whole device pixels, so a pan at a settled zoom copies the layer without resampling it.
     ctx.setTransform(1, 0, 0, 1, Math.round(s.dpr * s.view.x), Math.round(s.dpr * s.view.y))
@@ -311,6 +319,20 @@ function isAppended(previous, next) {
 
 function paintOverlay() {
   const ctx = overlayContext
+  const op = s.op
+  if (op?.kind === 'draw' && op.base.t === 'pen' && s.bitmap) {
+    // Ink accumulates: only the new part of the stroke is drawn, unless the view moved.
+    if (op.paintedView !== s.view || op.paintedSize !== overlayCanvas.width * 65536 + overlayCanvas.height) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height)
+      op.paintedView = s.view
+      op.paintedSize = overlayCanvas.width * 65536 + overlayCanvas.height
+      op.painted = 0
+    }
+    imageTransform(ctx)
+    op.painted = penSegments(ctx, op.base, op.points, op.painted)
+    return
+  }
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height)
   if (!s.bitmap) return
@@ -372,6 +394,12 @@ function readStageColor() {
 // ---- scene changes and history ----
 
 function setShapes(next) {
+  // Only what reopens intact may be kept; see sceneLimits.
+  if (!sceneFits(next, s.width, s.height, new Set(s.shapes))) {
+    toast('This image already holds as much markup as it can keep (5,000 shapes, 200,000 pen points, 20,000 characters).', 5000)
+    requestRender()
+    return
+  }
   s.past.push(s.shapes)
   if (s.past.length > HISTORY_LIMIT) s.past.shift()
   s.future = []
@@ -403,12 +431,13 @@ function redo() {
 }
 
 function deleteSelection() {
+  if (s.op) return
   const shape = selected()
   if (shape) setShapes(s.shapes.filter((candidate) => candidate !== shape))
 }
 
 function clearAll() {
-  if (s.shapes.length) setShapes([])
+  if (!s.op && s.shapes.length) setShapes([])
 }
 
 function select(shape) {
@@ -442,8 +471,10 @@ function commit() {
 }
 
 async function commitLoop() {
-  while (canSave() && s.shapes !== s.posted) {
-    const { shapes, version, bitmap } = s
+  while (canSave() && s.shapes !== s.posted && !s.awaitingDocument) {
+    // The bytes depend on the scene and the image only, so a version that moves on while they
+    // encode (Orca resending the same file) doesn't make them stale; a new image does.
+    const { shapes, bitmap } = s
     let bytes
     try {
       bytes = await encodeDocument(shapes)
@@ -451,23 +482,43 @@ async function commitLoop() {
       s.saveError = `Couldn't encode the markup: ${error?.message ?? error}`
       return
     }
-    if (version !== s.version || bitmap !== s.bitmap) return
+    if (bitmap !== s.bitmap) return
     if (bytes.byteLength > MAX_DOCUMENT_BYTES) {
       s.saveError = "The image with markup is over Orca's 64 MiB limit, too large to save."
       return
     }
+    const version = s.version
     try {
       await window.orca.document.applyEdit({ baseVersion: version, content: { kind: 'bytes', bytes: exactBuffer(bytes) } })
     } catch (error) {
-      // A conflict means the file changed outside Orca's tab; Orca sends the newer document next.
-      s.saveError = error?.code === 'conflict' ? null : `Orca didn't take the markup: ${error?.message ?? error}`
-      return
+      if (bitmap !== s.bitmap) return
+      if (error?.code !== 'conflict') {
+        s.saveError = `Orca didn't take the markup: ${error?.message ?? error}`
+        return
+      }
+      // Orca holds a newer document than the one this edit named. If it has already arrived as
+      // the same file, send again against it; otherwise send once it arrives (onDocument).
+      if (s.version === version) s.awaitingDocument = true
+      continue
     }
-    // A newer document arrived while Orca took this edit; it owns the session now.
-    if (version !== s.version || bitmap !== s.bitmap) return
+    if (bitmap !== s.bitmap) return
     s.posted = shapes
     s.lastPosted = bytes
     s.saveError = null
+  }
+}
+
+/** Orca awaits this before it saves; rejecting stops a save that would miss the latest markup. */
+async function flush() {
+  if (s.editing) commitTextEdit()
+  s.urgent = true
+  try {
+    await commit()
+  } finally {
+    s.urgent = false
+  }
+  if (canSave() && s.shapes !== s.posted) {
+    throw new Error(s.saveError ?? "The latest markup hasn't reached Orca yet; save again in a moment.")
   }
 }
 
@@ -483,7 +534,10 @@ async function encodeDocument(shapes) {
 function flattenedBlob(shapes, type = 'image/png') {
   const cache = s.flatCache
   if (cache && cache.shapes === shapes && cache.bitmap === s.bitmap && cache.type === type) return cache.blob
-  const blob = renderFlattened(s.bitmap, shapes, type)
+  const blob = renderFlattened(s.bitmap, shapes, type, {
+    urgent: () => s.urgent,
+    busy: () => s.op !== null || performance.now() - s.lastGesture < 300
+  })
   s.flatCache = { shapes, bitmap: s.bitmap, type, blob }
   blob.catch(() => {
     if (s.flatCache?.blob === blob) s.flatCache = null
@@ -526,14 +580,21 @@ async function copyImage() {
 let loadToken = 0
 
 /** Decodes image bytes, refusing ones whose header claims more than MAX_IMAGE_PIXELS. */
-async function decode(bytes) {
-  const size = imageSize(bytes)
-  if (size && size[0] * size[1] > MAX_IMAGE_PIXELS) {
+async function decode(bytes, { requireSize = false } = {}) {
+  const tooLarge = (width, height) => {
     const error = new Error('too large')
-    error.megapixels = Math.round((size[0] * size[1]) / 1e6)
-    throw error
+    error.megapixels = Math.round((width * height) / 1e6)
+    return error
   }
-  return createImageBitmap(new Blob([bytes]))
+  const size = imageSize(bytes)
+  if (size ? size[0] * size[1] > MAX_IMAGE_PIXELS : requireSize) throw tooLarge(...(size ?? [0, 0]))
+  const bitmap = await createImageBitmap(new Blob([bytes]))
+  // Headers can understate (or, for AVIF, not be read here); the decoded size is the truth.
+  if (bitmap.width * bitmap.height > MAX_IMAGE_PIXELS) {
+    bitmap.close()
+    throw tooLarge(bitmap.width, bitmap.height)
+  }
+  return bitmap
 }
 
 /** Drops the image so nothing can be edited or sent while a document can't be shown. */
@@ -553,9 +614,13 @@ function unloadImage(message, version) {
     selectedId: null,
     op: null,
     lastPosted: null,
+    awaitingDocument: false,
     flatCache: null
   })
   composite.canvas = null
+  $('info').textContent = ''
+  $('status').textContent = ''
+  controls.saveHint.hidden = true
   showMessage(message)
   requestRender()
   updateControls()
@@ -570,13 +635,14 @@ async function onDocument(doc) {
   // Orca hands back what this frame sent (after a save, or when the tab remounts the editor);
   // keep the live session, with its undo history and selection.
   if (s.bitmap && s.lastPosted && sameBytes(bytes, s.lastPosted)) {
+    // An image still decoding for an earlier document must not replace this newer one.
+    loadToken++
     s.version = doc.version
     s.readOnly = readOnly
     s.lastPosted = bytes
-    // Orca resends the bytes it just saved, so what it holds is now what the file holds.
-    if (s.shapes === s.posted) {
-      s.loaded = s.posted
-      s.hadMarkup = s.posted.length > 0
+    if (s.awaitingDocument) {
+      s.awaitingDocument = false
+      if (s.shapes !== s.posted) commit()
     }
     updateStatus()
     return
@@ -597,7 +663,8 @@ async function onDocument(doc) {
   let shapes = []
   try {
     if (markup) {
-      bitmap = await decode(markup.original).catch(() => null)
+      // Only this plugin ever decodes the original inside, so its header must vouch for its size.
+      bitmap = await decode(markup.original, { requireSize: true }).catch(() => null)
       shapes = bitmap ? parseScene(markup.scene, bitmap.width, bitmap.height) : null
       if (shapes) original = markup.original.slice()
       else {
@@ -626,7 +693,8 @@ async function onDocument(doc) {
     version: doc.version,
     readOnly,
     format,
-    savable: SAVABLE_FORMATS.has(format),
+    // Past the canvas limit the flattened image would come out blank, so such files are never written.
+    savable: SAVABLE_FORMATS.has(format) && bitmap.width <= MAX_CANVAS_SIDE && bitmap.height <= MAX_CANVAS_SIDE,
     original,
     hadMarkup: shapes.length > 0,
     lastPosted: bytes,
@@ -642,6 +710,7 @@ async function onDocument(doc) {
     selectedId: null,
     op: null,
     saveError: null,
+    awaitingDocument: false,
     flatCache: null
   })
   if (s.editing) cancelTextEdit()
@@ -658,7 +727,7 @@ async function onDocument(doc) {
 // ---- pointer interaction ----
 
 function startPan(event, point) {
-  s.op = { kind: 'pan', start: point, view: s.view }
+  s.op = { kind: 'pan', pointerId: event.pointerId, start: point, view: s.view }
   overlayCanvas.style.cursor = 'grabbing'
   overlayCanvas.setPointerCapture(event.pointerId)
 }
@@ -682,7 +751,7 @@ function onPointerDown(event) {
     const current = selected()
     const handle = current && handleAt(current, point)
     if (handle) {
-      s.op = { kind: 'handle', shape: current, handle, hides: current, preview: current }
+      s.op = { kind: 'handle', pointerId: event.pointerId, shape: current, handle, hides: current, preview: current }
     } else {
       const hit = shapeAt(s.shapes, x, y, tolerance(), measureText)
       if (!hit) {
@@ -691,7 +760,7 @@ function onPointerDown(event) {
         return
       }
       select(hit)
-      s.op = { kind: 'move', shape: hit, start: [x, y], hides: hit, preview: hit, moved: false }
+      s.op = { kind: 'move', pointerId: event.pointerId, shape: hit, start: [x, y], hides: hit, preview: hit, moved: false }
     }
   } else if (s.tool === 'text') {
     const hit = shapeAt(s.shapes, x, y, tolerance(), measureText)
@@ -701,7 +770,14 @@ function onPointerDown(event) {
   } else {
     select(null)
     const base = { t: s.tool, c: s.color, s: strokeFor(s.stroke) }
-    s.op = { kind: 'draw', base, start: [x, y], points: [x, y], preview: { ...base, p: s.tool === 'pen' ? [x, y] : [x, y, x, y] } }
+    s.op = {
+      kind: 'draw',
+      pointerId: event.pointerId,
+      base,
+      start: [x, y],
+      points: [x, y],
+      preview: s.tool === 'pen' ? null : { ...base, p: [x, y, x, y] }
+    }
   }
   overlayCanvas.setPointerCapture(event.pointerId)
   requestRender(s.op.hides !== undefined)
@@ -721,6 +797,8 @@ function onPointerMove(event) {
     hoverCursor(event)
     return
   }
+  // A second finger or a palm must not steer the stroke the first pointer started.
+  if (event.pointerId !== op.pointerId) return
   const point = stagePoint(event)
   if (op.kind === 'pan') {
     s.view = { ...op.view, x: op.view.x + point[0] - op.start[0], y: op.view.y + point[1] - op.start[1] }
@@ -748,7 +826,6 @@ function onPointerMove(event) {
       const ly = points[points.length - 1]
       if (Math.abs(px - lx) + Math.abs(py - ly) >= minStep) points.push(px, py)
     }
-    op.preview = { ...op.base, p: points }
   } else {
     const [ox, oy] = op.start
     const end = event.shiftKey ? (op.base.t === 'arrow' ? snapAngle(ox, oy, x, y) : snapSquare(ox, oy, x, y)) : [x, y]
@@ -759,10 +836,10 @@ function onPointerMove(event) {
 
 function onPointerUp(event) {
   const op = s.op
-  if (!op) return
+  if (!op || event.pointerId !== op.pointerId) return
   s.op = null
   if (overlayCanvas.hasPointerCapture(event.pointerId)) overlayCanvas.releasePointerCapture(event.pointerId)
-  if (event.type === 'pointercancel') {
+  if (event.type === 'pointercancel' || event.type === 'lostpointercapture') {
     requestRender()
     hoverCursor(event)
     return
@@ -780,11 +857,11 @@ function onPointerUp(event) {
 }
 
 function finishDrawing(op) {
-  const p = op.preview.p
   const minimum = 3 / s.view.scale
   if (op.base.t === 'pen') {
-    return { ...op.base, p: simplifyPoints(p, 0.4 / s.view.scale) }
+    return { ...op.base, p: simplifyPoints(op.points, 0.4 / s.view.scale) }
   }
+  const p = op.preview.p
   if (op.base.t === 'arrow') {
     return Math.hypot(p[2] - p[0], p[3] - p[1]) >= minimum ? op.preview : null
   }
@@ -820,6 +897,7 @@ function cursorAt(event) {
 function onWheel(event) {
   if (!s.bitmap) return
   event.preventDefault()
+  s.lastGesture = performance.now()
   const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? s.stageHeight : 1
   if (event.ctrlKey || event.metaKey) {
     // Trackpad pinches arrive as ctrl+wheel with small deltas; mouse wheels as larger steps.
@@ -923,6 +1001,7 @@ function closeTextEditor() {
 // ---- tools and styles ----
 
 function setTool(tool) {
+  if (s.op) return
   if (s.editing) commitTextEdit()
   s.tool = tool
   if (tool !== 'select') select(null)
@@ -931,6 +1010,7 @@ function setTool(tool) {
 }
 
 function setColor(color) {
+  if (s.op) return
   s.color = color
   if (s.editing) {
     s.editing.c = color
@@ -942,6 +1022,7 @@ function setColor(color) {
 }
 
 function setWidth(width) {
+  if (s.op) return
   s.stroke = width
   if (s.editing) {
     s.editing.z = fontSizeFor(width)
@@ -956,6 +1037,7 @@ function setWidth(width) {
 }
 
 function nudge(dx, dy) {
+  if (s.op) return
   const shape = selected()
   if (shape) replaceShape(shape, moveShape(shape, dx / s.view.scale, dy / s.view.scale))
 }
@@ -1061,7 +1143,7 @@ function buildToolbar() {
   controls.saveHint = document.createElement('span')
   controls.saveHint.className = 'save-hint'
   controls.saveHint.hidden = true
-  controls.saveHint.textContent = `Unsaved · ${SAVE_KEY}`
+  controls.saveHint.textContent = `${SAVE_KEY} saves into image`
   controls.saveHint.title = `${SAVE_KEY} saves the markup into this image, so agents and other apps see it`
   $('actions').append(
     controls.saveHint,
@@ -1108,13 +1190,19 @@ function updateStatus() {
     status = s.saveError
     tone = 'error'
   } else if (s.readOnly) status = canCopyImage ? 'Read-only file · Copy to share your markup' : 'Read-only file · markup is not saved'
-  else if (!s.savable) status = `${FORMAT_NAMES[s.format] ?? 'This'} files can't keep markup${canCopyImage ? ' · use Copy' : ''}`
+  else if (!s.savable) {
+    status = SAVABLE_FORMATS.has(s.format)
+      ? `Images over ${MAX_CANVAS_SIDE.toLocaleString('en-US')} px on a side can't keep markup`
+      : `${FORMAT_NAMES[s.format] ?? 'This'} files can't keep markup`
+    if (canCopyImage) status += ' · use Copy'
+  }
   else if (s.shapes !== s.loaded) {
     status = marks
       ? `${SAVE_KEY} saves the markup into this image · the original stays inside, still editable`
       : `${SAVE_KEY} restores the original image`
-  } else if (s.hadMarkup) status = 'Saved markup · clear it and save to restore the original'
-  controls.saveHint.hidden = !s.savable || s.readOnly || s.shapes === s.loaded
+  } else if (s.hadMarkup) status = 'Opened with markup · clear it and save to restore the original'
+  // Orca doesn't tell editors when it saves, so this is an instruction, not a dirty marker.
+  controls.saveHint.hidden = !s.savable || s.readOnly || !s.shapes.length
   const element = $('status')
   if (element.textContent !== status) element.textContent = status
   element.dataset.tone = tone
@@ -1143,6 +1231,8 @@ overlayCanvas.addEventListener('pointerdown', onPointerDown)
 overlayCanvas.addEventListener('pointermove', onPointerMove)
 overlayCanvas.addEventListener('pointerup', onPointerUp)
 overlayCanvas.addEventListener('pointercancel', onPointerUp)
+// Capture lost without a pointerup (the frame lost focus, say): drop the gesture, keep nothing half-done.
+overlayCanvas.addEventListener('lostpointercapture', onPointerUp)
 overlayCanvas.addEventListener('dblclick', (event) => {
   if (s.tool !== 'select' || !s.bitmap) return
   const [x, y] = toImage(s.view, ...stagePoint(event))
@@ -1161,6 +1251,18 @@ window.addEventListener('keyup', (event) => {
 })
 window.addEventListener('blur', () => (s.space = false))
 new ResizeObserver(resizeCanvases).observe(stage)
+// Moving to a display with another pixel density changes no size, so ResizeObserver stays quiet.
+;(function watchPixelRatio() {
+  matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener(
+    'change',
+    () => {
+      resizeCanvases()
+      watchPixelRatio()
+    },
+    { once: true }
+  )
+})()
+textEditor.maxLength = MAX_TEXT
 new MutationObserver(readStageColor).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
 readStageColor()
 resizeCanvases()
@@ -1171,8 +1273,5 @@ window.orca.document.onDidChange((doc) => {
   onDocument(doc)
 })
 // Orca waits for the returned promise before it saves.
-window.orca.on('editor.flush', () => {
-  if (s.editing) commitTextEdit()
-  return commit()
-})
+window.orca.on('editor.flush', flush)
 window.orca.on('theme', readStageColor)

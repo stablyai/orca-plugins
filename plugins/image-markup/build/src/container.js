@@ -17,6 +17,10 @@ const JPEG_MARKER = 0xe9 // APP9
 const JPEG_SIGNATURE = 'ORCA-MARKUP\0'
 // Segment length is a u16 that counts itself: 65535 - 2 (length) - 12 (signature) - 4 (index, count).
 const JPEG_SEGMENT_DATA = 65517
+// Far past real files (64 MiB of payload needs about 1,030 segments), but a crafted file of
+// millions of empty chunks is refused instead of parsed into a list that size.
+const MAX_PNG_CHUNKS = 65_536
+const MAX_JPEG_SEGMENTS = 8192
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256)
@@ -106,6 +110,7 @@ function pngChunks(bytes) {
     if (dataEnd + 4 > bytes.length) return null
     const type = String.fromCharCode(bytes[at + 4], bytes[at + 5], bytes[at + 6], bytes[at + 7])
     chunks.push({ type, start: at, dataStart, dataEnd, end: dataEnd + 4 })
+    if (chunks.length > MAX_PNG_CHUNKS) return null
     at = dataEnd + 4
     if (type === 'IEND') return chunks
   }
@@ -132,11 +137,22 @@ function writePngMarkup(flattened, original, scene) {
   if (!chunks) throw new Error('the encoder returned an unreadable PNG')
   const payload = encodePayload(pngPixelCrc(flattened, chunks), scene, original)
   const kept = chunks.filter((chunk) => chunk.type !== PNG_CHUNK)
+  // The original's pixel density (pHYs): without it a Retina screenshot shows at twice its size
+  // in Preview and Keynote. Colour chunks are not copied; the flattened pixels are sRGB.
+  const density = chunks.some((chunk) => chunk.type === 'pHYs')
+    ? null
+    : (pngChunks(original)?.find((chunk) => chunk.type === 'pHYs') ?? null)
+  let densityBytes = density ? original.subarray(density.start, density.end) : new Uint8Array(0)
   const keptLength = kept.reduce((sum, chunk) => sum + chunk.end - chunk.start, 0)
-  const out = new Uint8Array(8 + keptLength + 12 + payload.length)
+  const out = new Uint8Array(8 + keptLength + densityBytes.length + 12 + payload.length)
   out.set(PNG_SIGNATURE, 0)
   let at = 8
   for (const chunk of kept) {
+    if (chunk.type === 'IDAT' && densityBytes.length) {
+      out.set(densityBytes, at)
+      at += densityBytes.length
+      densityBytes = new Uint8Array(0)
+    }
     if (chunk.type === 'IEND') {
       writeU32(out, at, payload.length)
       out.set(ascii(PNG_CHUNK), at + 4)
@@ -172,6 +188,7 @@ function jpegSegments(bytes) {
     const end = at + 2 + readU16(bytes, at + 2)
     if (end > bytes.length) return null
     segments.push({ marker, start: at, end })
+    if (segments.length > MAX_JPEG_SEGMENTS) return null
     at = end
   }
   return null

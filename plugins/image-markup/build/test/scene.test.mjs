@@ -5,6 +5,7 @@ import {
   hitShape,
   moveShape,
   parseScene,
+  sceneFits,
   serializeScene,
   shapeAt,
   shapeBounds,
@@ -118,4 +119,22 @@ test('fits, zooms around a point, and maps both ways', () => {
   const before = toImage(view, 300, 200)
   const after = toImage(zoomed, 300, 200)
   assert.ok(Math.abs(before[0] - after[0]) < 1e-9 && Math.abs(before[1] - after[1]) < 1e-9)
+})
+
+test('the editor and the loader agree on limits, so saved markup reopens intact', () => {
+  const box = (i) => withId({ t: 'box', c: '#ff0000', s: 2, p: [i % 100, 0, (i % 100) + 5, 5] })
+  const many = Array.from({ length: 5000 }, (_, i) => box(i))
+  assert.ok(sceneFits(many, 100, 100))
+  assert.ok(!sceneFits([...many, box(1)], 100, 100))
+  assert.equal(parseScene(serializeScene([...many, box(1)], 100, 100), 100, 100).length, 5000)
+  // Strokes past the point budget are skipped, not the end of loading.
+  const pen = (n) => ({ t: 'pen', c: '#ff0000', s: 2, p: Array.from({ length: n * 2 }, (_, i) => i % 50) })
+  const kept = parseScene({ v: 1, w: 100, h: 100, shapes: [pen(150_000), pen(80_000), pen(40_000)] }, 100, 100)
+  assert.deepEqual(kept.map((shape) => shape.p.length / 2), [150_000, 40_000])
+  // Thick text on a tiny image, and markup well off a small image, both fit and reload.
+  const tiny = [withId({ t: 'text', c: '#ff0000', z: 22, x: 0, y: 0, text: 'x' }), withId({ t: 'box', c: '#ff0000', s: 4, p: [-500, -500, 900, 900] })]
+  assert.ok(sceneFits(tiny, 16, 16))
+  assert.equal(parseScene(serializeScene(tiny, 16, 16), 16, 16).length, 2)
+  // Crafted strokes far thicker than any tool makes are refused.
+  assert.equal(parseScene({ v: 1, w: 1000, h: 1000, shapes: [{ t: 'pen', c: '#ff0000', s: 1000, p: [0, 0, 1, 1] }] }, 1000, 1000).length, 0)
 })

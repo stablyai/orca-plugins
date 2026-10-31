@@ -130,6 +130,39 @@ export function drawShape(ctx, shape) {
   ctx.stroke(path)
 }
 
+/**
+ * Draws a pen stroke still being drawn from segment `from` on, and returns where to continue.
+ * Segment i is the curve penPath draws through point i, so a stroke drawn piece by piece looks
+ * the same as one drawn whole, and each pointer move costs its new points, not the whole stroke.
+ * The last half-segment waits for the next point (penPath's straight tail is drawn on commit).
+ */
+export function penSegments(ctx, style, p, from) {
+  const count = p.length / 2
+  ctx.strokeStyle = style.c
+  ctx.fillStyle = style.c
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = style.s
+  if (from === 0) {
+    ctx.beginPath()
+    ctx.arc(p[0], p[1], style.s / 2, 0, Math.PI * 2)
+    ctx.fill()
+    from = 1
+  }
+  if (count < 3 || from > count - 2) return from
+  ctx.beginPath()
+  const startX = from === 1 ? p[0] : (p[from * 2 - 2] + p[from * 2]) / 2
+  const startY = from === 1 ? p[1] : (p[from * 2 - 1] + p[from * 2 + 1]) / 2
+  ctx.moveTo(startX, startY)
+  for (let i = from; i < count - 1; i++) {
+    const x = p[i * 2]
+    const y = p[i * 2 + 1]
+    ctx.quadraticCurveTo(x, y, (x + p[i * 2 + 2]) / 2, (y + p[i * 2 + 3]) / 2)
+  }
+  ctx.stroke()
+  return count - 1
+}
+
 export function drawShapes(ctx, shapes, skip) {
   for (const shape of shapes) if (shape !== skip) drawShape(ctx, shape)
 }
@@ -139,7 +172,7 @@ export function drawShapes(ctx, shapes, skip) {
  * PNG goes through encodePng, which compresses far better than the canvas encoder; JPEG uses the
  * canvas encoder, which runs off the main thread.
  */
-export async function renderFlattened(bitmap, shapes, type) {
+export async function renderFlattened(bitmap, shapes, type, options) {
   const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
   const png = type === 'image/png'
   const ctx = canvas.getContext('2d', { alpha: png, willReadFrequently: png })
@@ -150,5 +183,5 @@ export async function renderFlattened(bitmap, shapes, type) {
   ctx.drawImage(bitmap, 0, 0)
   drawShapes(ctx, shapes)
   if (!png) return canvas.convertToBlob({ type, quality: 0.92 })
-  return new Blob([await encodePng(ctx.getImageData(0, 0, bitmap.width, bitmap.height))], { type })
+  return new Blob([await encodePng(ctx.getImageData(0, 0, bitmap.width, bitmap.height), options)], { type })
 }

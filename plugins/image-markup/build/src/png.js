@@ -1,29 +1,37 @@
 // A PNG encoder for the flattened image. Chromium's canvas encoder favours speed: it always writes
 // RGBA and compresses lightly, so a marked-up screenshot came out several times the size of the
 // original. This one writes RGB when every pixel is opaque, picks a filter per row (the minimum
-// sum of absolute differences heuristic libpng uses), and deflates with the browser's native
+// sum of absolute differences heuristic libpng uses; just Up once Orca is waiting on a save), and deflates with the browser's native
 // CompressionStream at zlib's default level. Workers are blocked in Orca's frame, so filtering
 // runs on the main thread in short slices scheduled in idle time, never inside a busy frame.
 // Drawing, panning and zooming stay smooth while a save encodes.
 import { crc32 } from './container.js'
 
 /** Work budget when the browser gives no idle deadline (timed-out callbacks, or no idle API). */
-const SLICE_MS = 6
-const IDLE_TIMEOUT_MS = 100
+const SLICE_MS = 8
+// Short, so a page with no idle time still encodes at a fair pace; long while the user is mid-
+// gesture, so encoding waits for real idle time instead of costing frames.
+const IDLE_TIMEOUT_MS = 24
+const BUSY_IDLE_TIMEOUT_MS = 250
 
 /**
  * Resolves with the time (performance.now()) this slice of work should stop by: the end of the
- * browser's idle period, so encoding fills idle time and never runs into a busy frame.
+ * browser's idle period, so encoding fills idle time and never runs into a busy frame. When the
+ * caller is in a hurry (Orca is waiting to save), there is no slicing at all.
  */
-const nextSlice = () =>
+const nextSlice = (urgent, busy) =>
   new Promise((resolve) => {
+    if (urgent()) {
+      resolve(Infinity)
+      return
+    }
     if (typeof requestIdleCallback !== 'function') {
       setTimeout(() => resolve(performance.now() + SLICE_MS), 0)
       return
     }
     requestIdleCallback(
       (deadline) => resolve(performance.now() + (deadline.didTimeout ? SLICE_MS : Math.max(1, deadline.timeRemaining()))),
-      { timeout: IDLE_TIMEOUT_MS }
+      { timeout: busy() ? BUSY_IDLE_TIMEOUT_MS : IDLE_TIMEOUT_MS }
     )
   })
 
@@ -57,6 +65,12 @@ function packRow(rgba, y, width, channels, out) {
 }
 
 const abs = (n) => (n < 128 ? n : 256 - n)
+
+/** Writes `row` Up-filtered: one cheap pass, and good for screenshots. Used when Orca is waiting. */
+function upFilterRow(row, previous, out) {
+  out[0] = 2
+  for (let i = 0; i < row.length; i++) out[i + 1] = (row[i] - previous[i]) & 0xff
+}
 
 /** Writes the best of None, Sub, Up and Paeth for `row` into `out` (filter byte first). */
 function filterRow(row, previous, bpp, out, scratch) {
@@ -96,8 +110,12 @@ function filterRow(row, previous, bpp, out, scratch) {
   if (best === 0) out.set(row, 1)
 }
 
-/** Encodes ImageData-like { width, height, data } as PNG bytes. */
-export async function encodePng({ width, height, data }) {
+/**
+ * Encodes ImageData-like { width, height, data } as PNG bytes. Between slices it polls
+ * `urgent()`, after which the rest is encoded without yielding, and `busy()`, which makes it wait
+ * longer for idle time.
+ */
+export async function encodePng({ width, height, data }, { urgent = () => false, busy = () => false } = {}) {
   const channels = isOpaque(data) ? 3 : 4
   const stride = width * channels
   const header = new Uint8Array(13)
@@ -115,19 +133,21 @@ export async function encodePng({ width, height, data }) {
   const scratch = new Uint8Array(stride)
   // Small batches keep each step well inside an idle period.
   const rowsPerBatch = Math.max(1, Math.floor((1 << 17) / (stride + 1)))
-  let sliceEnd = await nextSlice()
+  let sliceEnd = await nextSlice(urgent, busy)
   for (let y = 0; y < height; y += rowsPerBatch) {
     const rows = Math.min(rowsPerBatch, height - y)
     const batch = new Uint8Array(rows * (stride + 1))
     for (let r = 0; r < rows; r++) {
       packRow(data, y + r, width, channels, row)
-      filterRow(row, previous, channels, batch.subarray(r * (stride + 1), (r + 1) * (stride + 1)), scratch)
+      const out = batch.subarray(r * (stride + 1), (r + 1) * (stride + 1))
+      if (sliceEnd === Infinity) upFilterRow(row, previous, out)
+      else filterRow(row, previous, channels, out, scratch)
       ;[row, previous] = [previous, row]
     }
     writer.write(batch)
     // Backpressure: wait for the compressor before queueing more, so batches don't pile up.
     await writer.ready
-    if (performance.now() >= sliceEnd) sliceEnd = await nextSlice()
+    if (performance.now() >= sliceEnd) sliceEnd = urgent() ? Infinity : await nextSlice(urgent, busy)
   }
   writer.close()
   const idat = new Uint8Array(await compressed)

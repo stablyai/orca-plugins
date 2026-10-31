@@ -152,6 +152,26 @@ test('reads image sizes from headers without decoding', () => {
   assert.deepEqual(imageSize(webp), [800, 600])
 })
 
+test('PNG: the visible image keeps the original pixel density', () => {
+  const density = chunk('pHYs', Buffer.from([0, 0, 0x16, 0x25, 0, 0, 0x16, 0x25, 1]))
+  const plain = png(4, 3, [10, 20, 30])
+  const iend = plain.length - 12
+  const original = new Uint8Array([...plain.subarray(0, 33), ...density, ...plain.subarray(33, iend), ...plain.subarray(iend)])
+  const saved = writeMarkup('png', png(4, 3, [200, 0, 0]), original, SCENE)
+  const text = new TextDecoder('latin1').decode(saved)
+  assert.ok(text.indexOf('pHYs') > text.indexOf('IHDR') && text.indexOf('pHYs') < text.indexOf('IDAT'))
+  assert.ok(readMarkup(saved), 'the CRC still matches with the extra chunk')
+})
+
+test('refuses files with absurd numbers of chunks instead of listing them', () => {
+  const plain = png(1, 1, [0, 0, 0])
+  const empty = chunk('zzZz', Buffer.alloc(0))
+  const many = Buffer.concat([Buffer.from(plain.subarray(0, plain.length - 12)), ...Array(70_000).fill(empty), Buffer.from(plain.subarray(plain.length - 12))])
+  const start = performance.now()
+  assert.equal(readMarkup(new Uint8Array(many)), null)
+  assert.ok(performance.now() - start < 200)
+})
+
 test('refuses to write formats that cannot hold markup', () => {
   assert.throws(() => writeMarkup('webp', new Uint8Array(8), new Uint8Array(8), SCENE), /cannot save markup/)
 })

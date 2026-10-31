@@ -23,6 +23,7 @@ async function open(options) {
 }
 
 const tool = (frame, name) => frame.getByRole('button', { name, exact: true }).click()
+/** Asks the frame to flush as Orca does before a save; resolves with its error, or null. */
 const flush = (page) => page.evaluate(() => window.__flush())
 const info = (frame) => frame.locator('#info').textContent()
 const status = (frame) => frame.locator('#status').textContent()
@@ -104,7 +105,7 @@ test('reopening a saved file restores editable shapes; clearing them saves the o
   const { page, frame, errors, close } = await openEditor(browser)
   await postImage(page, frame, saved)
   assert.equal(await info(frame), '640 × 400 · PNG · 1 mark')
-  assert.match(await status(frame), /Saved markup/)
+  assert.match(await status(frame), /Opened with markup/)
   await frame.getByRole('button', { name: 'Clear all markup', exact: true }).click()
   await flush(page)
   const [restored] = await edits(page)
@@ -306,17 +307,116 @@ test('Copy writes a real PNG once the frame may write to the clipboard', async (
   await close()
 })
 
-test('the unsaved hint shows until Orca saves the markup', async () => {
+test('the save hint shows while there is markup to keep, and only for files that can keep it', async () => {
   const { page, frame, errors, close } = await open()
   const hint = frame.locator('.save-hint')
   assert.equal(await hint.isVisible(), false)
   await drag(page, frame, SIZE, [[100, 100], [200, 200]])
-  assert.equal(await hint.isVisible(), true)
+  assert.match(await hint.textContent(), /saves into image/)
+  await page.keyboard.press('Backspace') // nothing selected: no change
+  await frame.getByRole('button', { name: 'Clear all markup', exact: true }).click()
+  assert.equal(await hint.isVisible(), false)
+  await close()
+  const webp = await open({ image: { type: 'image/webp' }, post: { fileType: 'webp' } })
+  await drag(webp.page, webp.frame, SIZE, [[100, 100], [200, 200]])
+  assert.equal(await webp.frame.locator('.save-hint').isVisible(), false)
+  assert.deepEqual([...errors, ...webp.errors], [])
+  await webp.close()
+})
+
+test('a decode still running for an older document cannot replace a newer one', async () => {
+  const { page, frame, image, errors, close } = await open()
+  // A slow 24 MP image, then at once the file this frame already shows (the change reverted).
+  await postBytes(page, await makeImage(page, { width: 6000, height: 4000 }))
+  await postBytes(page, image)
+  await frame.waitForTimeout(1500)
+  assert.equal(await info(frame), '640 × 400 · PNG')
+  await drag(page, frame, SIZE, [[100, 100], [200, 200]])
+  assert.equal(await flush(page), null)
+  const sent = await page.evaluate(() => window.__edits.map((edit) => edit.baseVersion))
+  assert.deepEqual(sent, [3], 'the edit names the newest version, so Orca takes it')
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('an edit refused as stale is sent again once Orca delivers the newer document', async () => {
+  const { page, frame, image, errors, close } = await open()
+  await drag(page, frame, SIZE, [[100, 100], [200, 200]])
+  // Orca moved on (say, the tab reloaded the same file) before telling the frame.
+  await page.evaluate(() => window.__version++)
+  const error = await flush(page)
+  assert.match(error?.message ?? '', /hasn't reached Orca/, 'the save is stopped, not run without the markup')
+  assert.equal((await edits(page)).length, 0)
+  await postBytes(page, image)
+  await page.waitForFunction(() => window.__edits.length === 1)
+  assert.equal(await flush(page), null)
+  assert.equal(readMarkup((await edits(page))[0]).scene.shapes.length, 1)
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('a flush fails, so Orca does not save, when Orca refuses the markup', async () => {
+  const { page, frame, errors, close } = await open()
+  await page.evaluate(() => (window.__refuse = { code: 'too_large', message: 'too large' }))
+  await drag(page, frame, SIZE, [[100, 100], [200, 200]])
+  const error = await flush(page)
+  assert.match(error?.message ?? '', /Orca didn't take the markup/)
+  assert.match(await status(frame), /Orca didn't take the markup/)
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('a flush right after a stroke finishes within Orca\'s 1 s on a 12-megapixel image', async () => {
+  const big = [4240, 2830]
+  const { page, frame, errors, close } = await openEditor(browser)
+  await postImage(page, frame, await makeImage(page, { width: big[0], height: big[1] }))
+  await drag(page, frame, big, [[500, 500], [2000, 1500]])
+  const start = Date.now()
+  assert.equal(await flush(page), null)
+  const elapsed = Date.now() - start
+  console.log(`  12 MP flush straight after a stroke: ${elapsed} ms`)
+  assert.ok(elapsed < 1000, `${elapsed} ms`)
+  assert.equal((await edits(page)).length, 1)
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('a second pointer cannot end or steer the stroke the first one started', async () => {
+  const { page, frame, errors, close } = await open()
+  await frame.evaluate(() => {
+    const overlay = document.getElementById('overlay')
+    const rect = overlay.getBoundingClientRect()
+    const send = (type, id, x, y) =>
+      overlay.dispatchEvent(new PointerEvent(type, { pointerId: id, bubbles: true, clientX: rect.left + x, clientY: rect.top + y, button: 0, buttons: 1 }))
+    send('pointerdown', 1, 100, 100)
+    send('pointermove', 1, 150, 160)
+    send('pointerup', 7, 400, 400)
+    send('pointermove', 7, 600, 600)
+    send('pointermove', 1, 200, 100)
+    send('pointerup', 1, 200, 100)
+  })
   await flush(page)
-  // A save makes Orca send the file it wrote, which is what the frame posted.
-  await postBytes(page, (await edits(page)).at(-1))
-  await frame.waitForFunction(() => document.querySelector('.save-hint').hidden)
-  assert.match(await status(frame), /Saved markup/)
+  const [stroke] = readMarkup((await edits(page))[0]).scene.shapes
+  assert.ok(stroke.p.length >= 6, 'one stroke with all three of its own points')
+  assert.ok(Math.max(...stroke.p) < 400)
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('images past the canvas size limit open, but are never written blank', async () => {
+  const { page, frame, errors, close } = await openEditor(browser)
+  await postImage(page, frame, await makeImage(page, { width: 40000, height: 4 }))
+  assert.match(await status(frame), /over 32,767 px on a side can't keep markup/)
+  await frame.locator('#stage').click()
+  await flush(page)
+  assert.equal((await edits(page)).length, 0)
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('text is capped at what a saved file keeps', async () => {
+  const { frame, errors, close } = await open()
+  assert.equal(await frame.locator('#text-editor').evaluate((node) => node.maxLength), 4000)
   assert.deepEqual(errors, [])
   await close()
 })
@@ -370,24 +470,30 @@ test('stays fast: drawing and panning over 2,000 shapes on a 24-megapixel image'
     send('pointerdown', 50, 50)
     const draw = await measure(120, (i) => send('pointermove', 50 + i * 4, 50 + Math.sin(i / 8) * 60))
     send('pointerup', 530, 50)
+    // One very long stroke: each frame should cost its new points, not the whole stroke so far.
+    send('pointerdown', 40, 40)
+    for (let i = 0; i < 6000; i++) send('pointermove', 40 + (i % 400), 40 + Math.floor(i / 400) * 4)
+    const longStroke = await measure(60, (i) => send('pointermove', 40 + i * 3, 300))
+    send('pointerup', 220, 300)
     const wheel = (deltaX, deltaY, extra = {}) =>
       overlay.dispatchEvent(new WheelEvent('wheel', { deltaX, deltaY, bubbles: true, cancelable: true, clientX: rect.left + 300, clientY: rect.top + 300, ...extra }))
     const pan = await measure(60, () => wheel(3, 2))
     const zoom = await measure(60, (i) => wheel(0, i < 30 ? -4 : 4, { ctrlKey: true }))
-    return { draw, pan, zoom }
+    return { draw, longStroke, pan, zoom }
   })
   const flushStart = Date.now()
-  await flush(page)
+  assert.equal(await flush(page), null)
   const saveMs = Date.now() - flushStart
   console.log(
     `  24 MP, 2,000 strokes: load ${loadMs} ms; median frame interval drawing ${timing.draw.toFixed(1)} ms, ` +
-      `panning ${timing.pan.toFixed(1)} ms, zooming ${timing.zoom.toFixed(1)} ms; encode + save ${saveMs} ms`
+      `a 6,000-point stroke ${timing.longStroke.toFixed(1)} ms, panning ${timing.pan.toFixed(1)} ms, zooming ${timing.zoom.toFixed(1)} ms; flush ${saveMs} ms`
   )
   // Headless Chromium renders in software; a 60 Hz frame is 16.7 ms. Allow a little slack.
   assert.ok(timing.draw < 20, `drawing frame ${timing.draw} ms`)
+  assert.ok(timing.longStroke < 20, `long stroke frame ${timing.longStroke} ms`)
   assert.ok(timing.pan < 20, `panning frame ${timing.pan} ms`)
   assert.ok(timing.zoom < 34, `zooming frame ${timing.zoom} ms`)
-  assert.equal((await edits(page)).length, 1)
+  assert.equal(readMarkup((await edits(page)).at(-1)).scene.shapes.length, 2002)
   assert.deepEqual(errors, [])
   await close()
 })
