@@ -118,7 +118,7 @@ function painted(token, tokens, depth = 0) {
   }
   const under = TRANSLUCENT_APP_THEME_TOKENS[token] ?? '--background'
   const base = painted(under, tokens, depth + 1) ?? parseCssColor(tokens['--background'] ?? '')
-  return base ? parseHex(toHex(flatten(color, base))) : null
+  return base ? flatten(color, base) : null
 }
 
 /** A readable color for `token` on every surface it is read on, closest to its current one. */
