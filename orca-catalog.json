@@ -420,6 +420,58 @@
       ],
       "releases": [
         {
+          "version": "2.0.0",
+          "commit": "f75a0e560b6437c31b6a7b47d30ab7f86b30cc97",
+          "contentHash": "10654237eb5120e43de5a2c55629d0f314a0ffa7cf2d6a6bddf3a738ae37329f",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.245",
+          "name": "Excalidraw",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw, .excalidraw.json"
+            },
+            {
+              "kind": "newFiles",
+              "name": "New Excalidraw drawing",
+              "detail": ".excalidraw"
+            }
+          ],
+          "fileTypes": [
+            "excalidraw"
+          ],
+          "editorFileTypes": [
+            "excalidraw"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/excalidraw/images/cover.png",
+              "alt": "A hand-drawn architecture sketch of a web app, API gateway, services and database open in the Excalidraw editor",
+              "sha256": "85cc3391dbb7569b271d8367da9232b9806e0ea0bf183112e34fb304260f327d",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/excalidraw/images/editing.png",
+                "alt": "A box in the sketch selected, with Excalidraw's stroke, fill and font options beside it",
+                "sha256": "cf14ff5105a08d396765816de52be2eba5a0076af20e72f667a29ffcc2521152",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/excalidraw/images/dark.png",
+                "alt": "The same sketch in Excalidraw's dark theme",
+                "sha256": "5db71c99c28336bf8b942de84a8327bf81d23b33d4eff7788c6efed0ebc463c9",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
+        {
           "version": "1.1.0",
           "commit": "07590d2c7bdc8c6c9299123106b9e0525656a411",
           "contentHash": "475b1a58fddf5ef99778d11cd6127c5a224367d944db9cd00be31c0187eb2d9f",
@@ -2011,7 +2063,7 @@
       "releases": [
         {
           "version": "1.1.0",
-          "commit": "2af9a96f902e616e0f200f7ff7a91c69c8ebd66c",
+          "commit": "a501d84f15f796248f12678fd92e1f22e50bead4",
           "contentHash": "21f2dcecf215f92cb122732143a7d511433c7eb729deb8e588ba5a27a48b1aec",
           "execution": "data",
           "minimumOrca": "1.4.245",
