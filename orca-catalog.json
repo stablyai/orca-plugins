@@ -1979,6 +1979,40 @@
       ],
       "releases": [
         {
+          "version": "1.0.1",
+          "commit": "decb9ebd3372d0a06b1156ec4f494f1f1c620bb7",
+          "contentHash": "3283e6de5bb2e3ac0ac2701bc7d3611e978cb34a68f27e7a3c5eeac2e2d92a0c",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.245",
+          "name": "Image Markup",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Markup",
+              "detail": ".png, .jpg, .jpeg, .webp, .gif, .bmp, .avif"
+            }
+          ],
+          "fileTypes": [
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "gif",
+            "bmp",
+            "avif"
+          ],
+          "editorFileTypes": [
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "gif",
+            "bmp",
+            "avif"
+          ],
+          "license": "MIT"
+        },
+        {
           "version": "1.0.0",
           "commit": "69d51a36a51c166a4f1bbba363a79b6e84dffdc4",
           "contentHash": "6cf45b7036ce4acad969478bdb8fd7f46137689817d0570e4debe65cccdb4a82",
