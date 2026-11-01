@@ -74,6 +74,7 @@ state and saving.
   refused edit fails the flush, so Orca does not save older text.
 - `orca.files.saveAs({ suggestedName, mimeType, data })`: "Save to…" and image export (PNG, SVG).
   It needs the click's activation; when an export outlasts it, a "Save…" button asks for a new click.
+  It resolves `{ status: 'saved' | 'cancelled' }`; older Orca rejected a cancel with code `cancelled`.
 - `orca.shell.openExternal(url)`: opens `http:`, `https:` and `mailto:` element links.
 
 Orca offers `saveAs` and `openExternal` only to isolated frames (`orca.host.has`); elsewhere export

@@ -12,11 +12,16 @@ const aborted = () => new DOMException('The user aborted a request.', 'AbortErro
 
 /** Orca's save dialog; rejects with AbortError when the person cancels it. */
 async function saveAs(request) {
+  let result
   try {
-    await window.orca.files.saveAs(request)
+    result = await window.orca.files.saveAs(request)
   } catch (error) {
     // Why: Excalidraw shows an error for anything but AbortError, and a closed dialog is not one.
+    // Orca releases before `{ status }` rejected a closed dialog with code 'cancelled'.
     throw error?.code === 'cancelled' ? aborted() : error
+  }
+  if (result?.status === 'cancelled') {
+    throw aborted()
   }
 }
 
