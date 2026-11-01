@@ -3039,6 +3039,65 @@
       ],
       "releases": [
         {
+          "version": "1.0.1",
+          "commit": "2c75903f33203dede2d40db5fcc314aed19d3934",
+          "contentHash": "c2ac5f8980d80a4c99d51a41033e71bfbc48d854c05c598853a09ab5aecd8966",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "VS Code Default Themes for Orca",
+          "contributes": [
+            {
+              "kind": "themes",
+              "name": "VS Code Dark+"
+            },
+            {
+              "kind": "themes",
+              "name": "VS Code Dark Modern"
+            },
+            {
+              "kind": "themes",
+              "name": "VS Code Light+"
+            },
+            {
+              "kind": "themes",
+              "name": "VS Code Light Modern"
+            }
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-vscode-default-themes/vs-code-dark-modern.png",
+              "alt": "VS Code Dark Modern in Orca: a TypeScript file and its diff above a terminal showing git status and the 16 terminal colors",
+              "sha256": "332ab0bb4b2d9b638a68b341a291f6f0d6e1d187bb990b0fe16ba24d73803fad",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/orca-vscode-default-themes/vs-code-light-modern.png",
+                "alt": "VS Code Light Modern in Orca: the same file, diff and terminal",
+                "sha256": "cfe0a0a34d0b503b00fce34441d3b0a4368f577317e0efd563ef64276dc6c55d",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-vscode-default-themes/vs-code-dark.png",
+                "alt": "VS Code Dark+ in Orca: the same file, diff and terminal",
+                "sha256": "1803bbe86d4f9674654151c8e0d65e9646126771d5ca83d3a700cad00175d589",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-vscode-default-themes/vs-code-light.png",
+                "alt": "VS Code Light+ in Orca: the same file, diff and terminal",
+                "sha256": "0ecedf63664f568b52e5019cfd96b467e732a89194cabaa50babffbfff08aaf0",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          }
+        },
+        {
           "version": "1.0.0",
           "commit": "3ad7e2c36acf9fabb4148b99359dca95d345ba4c",
           "contentHash": "ce11b29f4c21bedeaa3613e7ce9c4a6863f800e6945754ad1e36d04e24991139",
