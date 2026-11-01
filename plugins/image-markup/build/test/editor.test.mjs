@@ -434,6 +434,62 @@ test('a second pointer cannot end or steer the stroke the first one started', as
   await close()
 })
 
+test('quick drags keep the release position even without a pointermove', async () => {
+  const { page, frame, errors, close } = await open()
+  for (const name of ['Pen', 'Arrow', 'Box', 'Ellipse']) {
+    await tool(frame, name)
+    await frame.evaluate(() => {
+      const overlay = document.getElementById('overlay')
+      const rect = overlay.getBoundingClientRect()
+      const send = (type, x, y) => overlay.dispatchEvent(new PointerEvent(type, {
+        pointerId: 1, bubbles: true, clientX: rect.left + x, clientY: rect.top + y,
+        button: 0, buttons: type === 'pointerup' ? 0 : 1
+      }))
+      send('pointerdown', 400, 300)
+      send('pointerup', 500, 350)
+    })
+  }
+  assert.equal(await flush(page), null)
+  const shapes = readMarkup((await edits(page)).at(-1)).scene.shapes
+  assert.deepEqual(shapes.map((shape) => shape.t), ['pen', 'arrow', 'box', 'ellipse'])
+  for (const shape of shapes) {
+    assert.equal(shape.p[2] - shape.p[0], 100)
+    assert.equal(shape.p[3] - shape.p[1], 50)
+  }
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+for (const ending of ['pointercancel', 'lostpointercapture']) {
+  test(`${ending} keeps the drawn stroke and lets the next stroke start`, async () => {
+    const { page, frame, errors, close } = await open()
+    const [x, y] = await pagePoint(page, frame, SIZE, 100, 100)
+    const [ex, ey] = await pagePoint(page, frame, SIZE, 200, 150)
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(ex, ey, { steps: 4 })
+    await frame.evaluate((type) => {
+      const overlay = document.getElementById('overlay')
+      // Cancellation/capture events need not contain the last pointer's coordinates.
+      overlay.dispatchEvent(new PointerEvent(type, { pointerId: 1, bubbles: true }))
+    }, ending)
+    await page.mouse.up()
+    assert.equal(await info(frame), '640 × 400 · PNG · 1 mark')
+    await drag(page, frame, SIZE, [[300, 100], [400, 150]])
+    assert.equal(await flush(page), null)
+    const saved = (await edits(page)).at(-1)
+    const shapes = readMarkup(saved).scene.shapes
+    assert.equal(shapes.length, 2)
+    assert.deepEqual(shapes[0].p, [100, 100, 200, 150])
+    assert.ok(near(await pixel(page, saved, 150, 125), RED))
+    await tool(frame, 'Undo')
+    await tool(frame, 'Undo')
+    assert.equal(await info(frame), '640 × 400 · PNG')
+    assert.deepEqual(errors, [])
+    await close()
+  })
+}
+
 test('images past the canvas size limit open, but are never written blank', async () => {
   const { page, frame, errors, close } = await openEditor(browser)
   await postImage(page, frame, await makeImage(page, { width: 40000, height: 4 }))

@@ -844,9 +844,13 @@ function onPointerMove(event) {
 function onPointerUp(event) {
   const op = s.op
   if (!op || event.pointerId !== op.pointerId) return
+  const interrupted = event.type === 'pointercancel' || event.type === 'lostpointercapture'
+  // The release may be the only sample after pointerdown in a quick drag. Capture-loss and
+  // cancel events have no reliable position: keep the last drawn points instead.
+  if (!interrupted) onPointerMove(event)
   s.op = null
   if (overlayCanvas.hasPointerCapture(event.pointerId)) overlayCanvas.releasePointerCapture(event.pointerId)
-  if (event.type === 'pointercancel' || event.type === 'lostpointercapture') {
+  if (interrupted && op.kind !== 'draw') {
     requestRender()
     hoverCursor(event)
     return
@@ -1238,7 +1242,7 @@ overlayCanvas.addEventListener('pointerdown', onPointerDown)
 overlayCanvas.addEventListener('pointermove', onPointerMove)
 overlayCanvas.addEventListener('pointerup', onPointerUp)
 overlayCanvas.addEventListener('pointercancel', onPointerUp)
-// Capture lost without a pointerup (the frame lost focus, say): drop the gesture, keep nothing half-done.
+// Capture lost without a pointerup: finish the ink already drawn so an interruption cannot erase it.
 overlayCanvas.addEventListener('lostpointercapture', onPointerUp)
 overlayCanvas.addEventListener('dblclick', (event) => {
   if (s.tool !== 'select' || !s.bitmap) return
