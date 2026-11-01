@@ -1,78 +1,26 @@
-// Builds ../editor/index.html: one self-contained file, because the editor frame's CSP allows only
-// inline scripts and styles and data: fonts and images. Also writes ../THIRD_PARTY_NOTICES.txt
-// from the packages that end up in the bundle.
-// Usage: npm ci && node build.mjs
+// Builds ../editor (see README.md):
+//   assets/ (with assets/fonts/)  the multi-file editor, for Orca's isolated frames;
+//   index.html                    loads it, and inlines a single-file build for srcdoc frames.
+// Also writes ../THIRD_PARTY_NOTICES.txt, then runs test/subset-glue.test.mjs.
+// Usage: npm ci --ignore-scripts && node build.mjs
 import { build } from 'esbuild'
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
+import { SKIPPED_FONT_FAMILIES, adaptExcalidraw, evaluatesStrings } from './excalidraw-patches.mjs'
 
 const HERE = import.meta.dirname
 const PLUGIN = path.resolve(HERE, '..')
-const OUT = path.join(PLUGIN, 'editor', 'index.html')
+const EDITOR = path.join(PLUGIN, 'editor')
 const NOTICES = path.join(PLUGIN, 'THIRD_PARTY_NOTICES.txt')
 const EXCALIDRAW_DIST = path.join(HERE, 'node_modules', '@excalidraw', 'excalidraw', 'dist', 'prod')
-// Why: the CJK font alone is 12 MB in ~200 shards; those characters fall back to a system font.
-// Liberation Sans is the GPL-licensed fallback of the deprecated Helvetica family.
-const SKIPPED_FONT_FAMILIES = new Set(['Xiaolai', 'Liberation'])
+// Why: Orca reads each plugin file whole and refuses files over 10 MiB.
+const MAX_FILE_BYTES = 10 * 1024 * 1024
 
-const dataUrl = (file) => `data:font/woff2;base64,${readFileSync(file).toString('base64')}`
-
-// Why: pica's WebAssembly resizer needs 'wasm-unsafe-eval', which the frame CSP refuses (it then
-// falls back to JavaScript anyway, after logging a CSP violation).
-const PICA_FEATURES = 'features:["js","wasm"]'
-let picaFeaturesPatched = false
-
-/** Adapts Excalidraw's prebuilt files to the frame: embedded fonts, and no WebAssembly resizing. */
-const adaptExcalidrawDist = {
-  name: 'adapt-excalidraw-dist',
-  setup(context) {
-    context.onLoad({ filter: /[\\/]@excalidraw[\\/]excalidraw[\\/]dist[\\/]prod[\\/].*\.js$/ }, (args) => {
-      let code = readFileSync(args.path, 'utf8').replace(
-        /"\.\/fonts\/([A-Za-z]+)\/([\w.-]+\.woff2)"/g,
-        (_, family, file) =>
-          // Why `local:`: Excalidraw resolves that prefix to no URL, so it never fetches the font.
-          SKIPPED_FONT_FAMILIES.has(family)
-            ? JSON.stringify(`local:${family}`)
-            : JSON.stringify(dataUrl(path.join(EXCALIDRAW_DIST, 'fonts', family, file)))
-      )
-      if (code.includes(PICA_FEATURES)) {
-        code = code.replaceAll(PICA_FEATURES, 'features:["js"]')
-        picaFeaturesPatched = true
-      }
-      return { contents: code, loader: 'js' }
-    })
-  }
-}
-
-/** Stand-ins for code the frame can never run; each would otherwise cost megabytes. */
-const stubUnreachableModules = {
-  name: 'stub-unreachable-modules',
-  setup(context) {
-    // Why: the editor always runs in English (the host sends no locale); Excalidraw imports others lazily.
-    context.onResolve({ filter: /^\.\/locales\/[\w-]+\.js$/ }, (args) =>
-      /^\.\/locales\/(en|percentages)-/.test(args.path) ? undefined : { path: 'locale', namespace: 'stub' }
-    )
-    // Why: font subsetting is 1.8 MB of WebAssembly, which the frame CSP refuses to compile; exports
-    // then embed whole fonts instead of subsets.
-    context.onResolve({ filter: /^\.\/subset-(shared|worker)\.chunk\.js$/ }, (args) => ({
-      path: args.path.includes('worker') ? 'subset-worker' : 'subset-shared',
-      namespace: 'stub'
-    }))
-    context.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => ({
-      contents: readFileSync(path.join(HERE, 'src', 'stubs', `${args.path}.js`), 'utf8'),
-      resolveDir: path.join(HERE, 'src', 'stubs'),
-      loader: 'js'
-    }))
-  }
-}
-
-const result = await build({
-  entryPoints: [path.join(HERE, 'src', 'editor.jsx')],
+const COMMON = {
   bundle: true,
   write: false,
-  outdir: path.join(HERE, 'out'),
-  format: 'iife',
   platform: 'browser',
   conditions: ['production'],
   target: 'chrome120',
@@ -82,54 +30,141 @@ const result = await build({
   metafile: true,
   logLevel: 'warning',
   absWorkingDir: HERE,
-  define: { 'process.env.NODE_ENV': '"production"', 'process.env.IS_PREACT': '"false"' },
-  loader: { '.woff2': 'dataurl' },
-  plugins: [stubUnreachableModules, adaptExcalidrawDist]
+  define: { 'process.env.NODE_ENV': '"production"', 'process.env.IS_PREACT': '"false"' }
+}
+
+/** Excalidraw reads and writes files through browser-fs-access; src/orca-file-access.js replaces it. */
+const orcaFileAccess = {
+  name: 'orca-file-access',
+  setup(context) {
+    context.onResolve({ filter: /^browser-fs-access$/ }, () => ({
+      path: path.join(HERE, 'src', 'orca-file-access.js')
+    }))
+  }
+}
+
+/** Stand-ins for code a srcdoc frame can never run; each would otherwise cost megabytes. */
+const srcdocStubs = {
+  name: 'srcdoc-stubs',
+  setup(context) {
+    // Why: inlined, every locale would load with the page; this editor runs in English.
+    context.onResolve({ filter: /^\.\/locales\/[\w-]+\.js$/ }, (args) =>
+      /^\.\/locales\/(en|percentages)-/.test(args.path) ? undefined : { path: 'locale', namespace: 'stub' }
+    )
+    // Why: font subsetting is 1.8 MB of WebAssembly, which the srcdoc CSP refuses to compile; exports
+    // then embed whole fonts instead of subsets.
+    context.onResolve({ filter: /^\.\/subset-(shared|worker)\.chunk\.js$/ }, (args) => ({
+      path: args.path.includes('worker') ? 'subset-worker' : 'subset-shared',
+      namespace: 'stub'
+    }))
+    context.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => ({
+      contents: readFileSync(path.join(HERE, 'src', 'srcdoc', 'stubs', `${args.path}.js`), 'utf8'),
+      resolveDir: path.join(HERE, 'src', 'srcdoc', 'stubs'),
+      loader: 'js'
+    }))
+  }
+}
+
+const guestPatches = adaptExcalidraw('guest', EXCALIDRAW_DIST)
+const guest = await build({
+  ...COMMON,
+  entryPoints: { editor: path.join(HERE, 'src', 'main.js') },
+  splitting: true,
+  outdir: EDITOR,
+  entryNames: 'assets/[name]-[hash]',
+  chunkNames: 'assets/[name]-[hash]',
+  format: 'esm',
+  define: { ...COMMON.define, __EDITOR_FRAME__: '"guest"' },
+  plugins: [orcaFileAccess, guestPatches.plugin]
 })
+guestPatches.check()
 
-if (!picaFeaturesPatched) {
-  throw new Error(`${PICA_FEATURES} is no longer in Excalidraw; recheck image resizing under the frame CSP`)
-}
-const bundledJs = result.outputFiles.find((file) => file.path.endsWith('.js')).text
-const css = result.outputFiles.find((file) => file.path.endsWith('.css')).text
-// Why: `<!--` then `<script` inside an inline script puts the HTML parser in a state where `</script>`
-// no longer ends it. Every occurrence is inside a string or regex literal, where `\x3C` reads the same.
-const js = bundledJs.replace(/<(!--|script)/gi, '\\x3C$1')
-new vm.Script(js)
-if (/<\/script/i.test(js) || /<\/style/i.test(css)) {
-  throw new Error('the bundle contains a closing script or style tag; it cannot be inlined')
-}
-if (/\beval\(|new Function\(/.test(js)) {
-  console.warn('warning: the bundle contains eval or new Function; the frame CSP refuses both')
+const srcdocPatches = adaptExcalidraw('srcdoc', EXCALIDRAW_DIST)
+const srcdoc = await build({
+  ...COMMON,
+  entryPoints: [path.join(HERE, 'src', 'srcdoc', 'entry.js')],
+  outdir: path.join(HERE, 'out'),
+  format: 'iife',
+  define: { ...COMMON.define, __EDITOR_FRAME__: '"srcdoc"' },
+  loader: { '.woff2': 'dataurl' },
+  plugins: [srcdocStubs, orcaFileAccess, srcdocPatches.plugin]
+})
+srcdocPatches.check()
+
+const relativeToEditor = (file) => path.relative(EDITOR, file).split(path.sep).join('/')
+const guestFile = (output) => `./${relativeToEditor(path.join(HERE, output))}`
+const [entryJs, entryOutput] = Object.entries(guest.metafile.outputs).find(
+  ([, output]) => output.entryPoint === 'src/main.js'
+)
+const assets = {
+  entry: guestFile(entryJs),
+  css: guestFile(entryOutput.cssBundle),
+  preload: entryOutput.imports.filter((chunk) => chunk.kind === 'import-statement').map((chunk) => guestFile(chunk.path))
 }
 
+// The single-file editor sits in <script type="text/plain">, which the HTML parser ends at `</script`.
+// Why the escapes: `<!--` then `<script` puts the parser in a state where `</script>` no longer ends
+// it. Every occurrence is inside a string or regex literal, where `\x3C` reads the same.
+const srcdocJs = srcdoc.outputFiles.find((file) => file.path.endsWith('.js')).text.replace(/<(!--|script)/gi, '\\x3C$1')
+const srcdocCss = srcdoc.outputFiles.find((file) => file.path.endsWith('.css')).text
+new vm.Script(srcdocJs)
+if (/<\/script/i.test(srcdocJs) || /<\/script|<!--/i.test(srcdocCss)) {
+  throw new Error('the single-file editor contains a closing script tag; it cannot be inlined')
+}
+const bootstrap = readFileSync(path.join(HERE, 'src', 'bootstrap.js'), 'utf8').replace(
+  '__ASSETS__',
+  JSON.stringify(assets)
+)
 const html = `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <title>Excalidraw</title>
 <style>
-html, body, #root { height: 100%; margin: 0; overflow: hidden; }
-.orca-excalidraw-message { box-sizing: border-box; display: flex; height: 100%; align-items: center;
-  justify-content: center; padding: 24px; text-align: center; font: 13px/1.5 system-ui, sans-serif;
-  color: var(--orca-muted-foreground, #737373); background: var(--orca-background, transparent); }
-/* The library lives only in memory here and its browser is an external site, so it stays hidden. */
-.default-sidebar-trigger, .library-menu-browse-button { display: none !important; }
+${readFileSync(path.join(HERE, 'src', 'page.css'), 'utf8').trim()}
 </style>
-<style>${css}</style>
 </head>
 <body>
 <div id="root"></div>
-<script>${js}</script>
+<script type="text/plain" id="orca-excalidraw-css">${srcdocCss}</script>
+<script type="text/plain" id="orca-excalidraw-js">${srcdocJs}</script>
+<script>
+${bootstrap.trim()}
+</script>
 </body>
 </html>
 `
-mkdirSync(path.dirname(OUT), { recursive: true })
-writeFileSync(OUT, html)
 
-// Notices: every npm package with code in the bundle, then the embedded fonts.
+const written = [{ file: path.join(EDITOR, 'index.html'), bytes: Buffer.from(html) }]
+for (const file of guest.outputFiles) {
+  written.push({ file: file.path, bytes: Buffer.from(file.contents) })
+}
+const scripts = [
+  ['the single-file editor', srcdocJs],
+  ...guest.outputFiles.filter((file) => file.path.endsWith('.js')).map((file) => [relativeToEditor(file.path), file.text])
+]
+for (const [name, code] of scripts) {
+  if (evaluatesStrings(code)) {
+    throw new Error(`${name} evaluates strings as code (eval or Function), which the frame CSPs refuse`)
+  }
+}
+rmSync(EDITOR, { recursive: true, force: true })
+for (const { file, bytes } of written) {
+  if (bytes.length > MAX_FILE_BYTES) {
+    throw new Error(`${relativeToEditor(file)} is ${bytes.length} bytes; Orca reads at most ${MAX_FILE_BYTES}`)
+  }
+  mkdirSync(path.dirname(file), { recursive: true })
+  writeFileSync(file, bytes)
+}
+for (const family of readdirSync(path.join(EXCALIDRAW_DIST, 'fonts')).sort()) {
+  if (!SKIPPED_FONT_FAMILIES.has(family)) {
+    cpSync(path.join(EXCALIDRAW_DIST, 'fonts', family), path.join(EDITOR, 'assets', 'fonts', family), { recursive: true })
+  }
+}
+
+// Notices: every npm package with code in either build, then the font subsetter and the fonts.
 const packages = new Map()
-for (const input of Object.keys(result.metafile.inputs)) {
+for (const input of [...Object.keys(guest.metafile.inputs), ...Object.keys(srcdoc.metafile.inputs)]) {
   const at = input.lastIndexOf('node_modules/')
   if (at === -1) continue
   const name = /^(?:@[^/]+\/)?[^/]+/.exec(input.slice(at + 'node_modules/'.length))[0]
@@ -155,11 +190,18 @@ const sections = [...packages.values()]
 if (missingLicences.length > 0) {
   throw new Error(`packages without a licence file; add:\n${missingLicences.join('\n')}`)
 }
-const fonts = readFileSync(path.join(HERE, 'font-notices.txt'), 'utf8').trim()
+const extraNotices = ['subsetter-notices.txt', 'font-notices.txt'].map((file) =>
+  readFileSync(path.join(HERE, file), 'utf8').trim()
+)
 writeFileSync(
   NOTICES,
-  `The Excalidraw editor in editor/index.html bundles the following software and fonts.\n\n` +
-    `${[...sections, fonts].join(`\n\n${'='.repeat(78)}\n\n`)}\n`
+  `The Excalidraw editor in editor/ bundles the following software and fonts.\n\n` +
+    `${[...sections, ...extraNotices].join(`\n\n${'='.repeat(78)}\n\n`)}\n`
 )
 
-console.log(`editor/index.html: ${Buffer.byteLength(html)} bytes, ${packages.size} packages`)
+const totalBytes = written.reduce((sum, { bytes }) => sum + bytes.length, 0)
+console.log(
+  `editor/: ${written.length} files, ${totalBytes} bytes of HTML/JS/CSS (index.html ${written[0].bytes.length}), ` +
+    `${packages.size} packages`
+)
+execFileSync(process.execPath, [path.join(HERE, 'test', 'subset-glue.test.mjs')], { stdio: 'inherit' })

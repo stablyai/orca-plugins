@@ -6,6 +6,7 @@
     "--editor-surface": "#1e1e1e",
     "--popover": "#252526",
     "--border": "#303031",
+    "--input": "#767676",
     "--foreground": "#d4d4d4",
     "--popover-foreground": "#cccccc"
   },

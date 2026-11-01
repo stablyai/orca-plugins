@@ -450,6 +450,110 @@
       ],
       "releases": [
         {
+          "version": "2.0.1",
+          "commit": "9de79a66b32db9a975f007c16cd5f65daaa8066c",
+          "contentHash": "6647fb7d4c5146ddf220566554577d6bc0efc3eda91cf5c6fe1dbf1113b4cebf",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.245",
+          "name": "Excalidraw",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw, .excalidraw.json"
+            },
+            {
+              "kind": "newFiles",
+              "name": "New Excalidraw drawing",
+              "detail": ".excalidraw"
+            }
+          ],
+          "fileTypes": [
+            "excalidraw"
+          ],
+          "editorFileTypes": [
+            "excalidraw"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/excalidraw/images/cover.png",
+              "alt": "A hand-drawn architecture sketch of a web app, API gateway, services and database open in the Excalidraw editor",
+              "sha256": "85cc3391dbb7569b271d8367da9232b9806e0ea0bf183112e34fb304260f327d",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/excalidraw/images/editing.png",
+                "alt": "A box in the sketch selected, with Excalidraw's stroke, fill and font options beside it",
+                "sha256": "cf14ff5105a08d396765816de52be2eba5a0076af20e72f667a29ffcc2521152",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/excalidraw/images/dark.png",
+                "alt": "The same sketch in Excalidraw's dark theme",
+                "sha256": "5db71c99c28336bf8b942de84a8327bf81d23b33d4eff7788c6efed0ebc463c9",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
+        {
+          "version": "2.0.0",
+          "commit": "66f73ba203132cfef937663224b988b6ac84b49f",
+          "contentHash": "f8942a6bcb14eedeb67f9d16ed44a391ce1130b5d1189a310948ae21507ea91d",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.245",
+          "name": "Excalidraw",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw, .excalidraw.json"
+            },
+            {
+              "kind": "newFiles",
+              "name": "New Excalidraw drawing",
+              "detail": ".excalidraw"
+            }
+          ],
+          "fileTypes": [
+            "excalidraw"
+          ],
+          "editorFileTypes": [
+            "excalidraw"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/excalidraw/images/cover.png",
+              "alt": "A hand-drawn architecture sketch of a web app, API gateway, services and database open in the Excalidraw editor",
+              "sha256": "85cc3391dbb7569b271d8367da9232b9806e0ea0bf183112e34fb304260f327d",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/excalidraw/images/editing.png",
+                "alt": "A box in the sketch selected, with Excalidraw's stroke, fill and font options beside it",
+                "sha256": "cf14ff5105a08d396765816de52be2eba5a0076af20e72f667a29ffcc2521152",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/excalidraw/images/dark.png",
+                "alt": "The same sketch in Excalidraw's dark theme",
+                "sha256": "5db71c99c28336bf8b942de84a8327bf81d23b33d4eff7788c6efed0ebc463c9",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
+        {
           "version": "1.1.0",
           "commit": "07590d2c7bdc8c6c9299123106b9e0525656a411",
           "contentHash": "475b1a58fddf5ef99778d11cd6127c5a224367d944db9cd00be31c0187eb2d9f",
@@ -1876,8 +1980,8 @@
       "releases": [
         {
           "version": "1.0.1",
-          "commit": "7de647238edd024f48bfd8f20763a7aec7ca0dc1",
-          "contentHash": "accc04f7e01cb7b3d5dff7bb2e734d3582fa5beaa48558706c3a771d3412b05f",
+          "commit": "decb9ebd3372d0a06b1156ec4f494f1f1c620bb7",
+          "contentHash": "3283e6de5bb2e3ac0ac2701bc7d3611e978cb34a68f27e7a3c5eeac2e2d92a0c",
           "execution": "sandboxed-ui",
           "minimumOrca": "1.4.245",
           "name": "Image Markup",
@@ -2968,6 +3072,65 @@
         "official"
       ],
       "releases": [
+        {
+          "version": "1.0.1",
+          "commit": "2c75903f33203dede2d40db5fcc314aed19d3934",
+          "contentHash": "c2ac5f8980d80a4c99d51a41033e71bfbc48d854c05c598853a09ab5aecd8966",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "VS Code Default Themes for Orca",
+          "contributes": [
+            {
+              "kind": "themes",
+              "name": "VS Code Dark+"
+            },
+            {
+              "kind": "themes",
+              "name": "VS Code Dark Modern"
+            },
+            {
+              "kind": "themes",
+              "name": "VS Code Light+"
+            },
+            {
+              "kind": "themes",
+              "name": "VS Code Light Modern"
+            }
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-vscode-default-themes/vs-code-dark-modern.png",
+              "alt": "VS Code Dark Modern in Orca: a TypeScript file and its diff above a terminal showing git status and the 16 terminal colors",
+              "sha256": "332ab0bb4b2d9b638a68b341a291f6f0d6e1d187bb990b0fe16ba24d73803fad",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/orca-vscode-default-themes/vs-code-light-modern.png",
+                "alt": "VS Code Light Modern in Orca: the same file, diff and terminal",
+                "sha256": "cfe0a0a34d0b503b00fce34441d3b0a4368f577317e0efd563ef64276dc6c55d",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-vscode-default-themes/vs-code-dark.png",
+                "alt": "VS Code Dark+ in Orca: the same file, diff and terminal",
+                "sha256": "1803bbe86d4f9674654151c8e0d65e9646126771d5ca83d3a700cad00175d589",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "assets/orca-vscode-default-themes/vs-code-light.png",
+                "alt": "VS Code Light+ in Orca: the same file, diff and terminal",
+                "sha256": "0ecedf63664f568b52e5019cfd96b467e732a89194cabaa50babffbfff08aaf0",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          }
+        },
         {
           "version": "1.0.0",
           "commit": "3ad7e2c36acf9fabb4148b99359dca95d345ba4c",

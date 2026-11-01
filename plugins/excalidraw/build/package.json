@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "test": "node test/subset-glue.test.mjs"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "0.18.1",
