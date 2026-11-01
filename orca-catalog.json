@@ -56,7 +56,17 @@
                 "height": 1000
               }
             ]
-          }
+          },
+          "themePreview": [
+            {
+              "label": "Orca Midnight",
+              "base": "dark",
+              "background": "#101216",
+              "foreground": "#e8eaf0",
+              "accent": "#e8eaf0",
+              "surface": "#161920"
+            }
+          ]
         }
       ]
     },
@@ -112,7 +122,17 @@
                 "height": 1000
               }
             ]
-          }
+          },
+          "themePreview": [
+            {
+              "label": "Nord",
+              "base": "dark",
+              "background": "#2e3440",
+              "foreground": "#eceff4",
+              "accent": "#88c0d0",
+              "surface": "#3b4252"
+            }
+          ]
         }
       ]
     },
@@ -172,7 +192,17 @@
                 "height": 1000
               }
             ]
-          }
+          },
+          "themePreview": [
+            {
+              "label": "Orca OLED",
+              "base": "dark",
+              "background": "#000000",
+              "foreground": "#e6e6e6",
+              "accent": "#e6e6e6",
+              "surface": "#000000"
+            }
+          ]
         }
       ]
     },
@@ -1040,7 +1070,25 @@
                 "height": 1000
               }
             ]
-          }
+          },
+          "themePreview": [
+            {
+              "label": "Dusk",
+              "base": "dark",
+              "background": "#1d1533",
+              "foreground": "#e8e0ff",
+              "accent": "#c38bff",
+              "surface": "#241843"
+            },
+            {
+              "label": "Ember",
+              "base": "light",
+              "background": "#fff6ec",
+              "foreground": "#3b1d0a",
+              "accent": "#b4410f",
+              "surface": "#fffaf4"
+            }
+          ]
         }
       ]
     },
@@ -1085,7 +1133,17 @@
               "width": 1600,
               "height": 1000
             }
-          }
+          },
+          "themePreview": [
+            {
+              "label": "GitHub Light",
+              "base": "light",
+              "background": "#ffffff",
+              "foreground": "#1f2328",
+              "accent": "#0969da",
+              "surface": "#f6f8fa"
+            }
+          ]
         },
         {
           "version": "1.0.1",
@@ -1158,7 +1216,17 @@
               "width": 1600,
               "height": 1000
             }
-          }
+          },
+          "themePreview": [
+            {
+              "label": "Solarized Light",
+              "base": "light",
+              "background": "#fdf6e3",
+              "foreground": "#586e75",
+              "accent": "#2073ae",
+              "surface": "#eee8d5"
+            }
+          ]
         }
       ]
     },
@@ -1203,7 +1271,17 @@
               "width": 1600,
               "height": 1000
             }
-          }
+          },
+          "themePreview": [
+            {
+              "label": "Dracula",
+              "base": "dark",
+              "background": "#282a36",
+              "foreground": "#f8f8f2",
+              "accent": "#bd93f9",
+              "surface": "#343746"
+            }
+          ]
         }
       ]
     },
@@ -1256,7 +1334,25 @@
               "width": 1600,
               "height": 1000
             }
-          }
+          },
+          "themePreview": [
+            {
+              "label": "Gruvbox Dark",
+              "base": "dark",
+              "background": "#282828",
+              "foreground": "#ebdbb2",
+              "accent": "#fabd2f",
+              "surface": "#32302f"
+            },
+            {
+              "label": "Gruvbox Light",
+              "base": "light",
+              "background": "#fbf1c7",
+              "foreground": "#3c3836",
+              "accent": "#9d0006",
+              "surface": "#f2e5bc"
+            }
+          ]
         }
       ]
     },
@@ -2588,14 +2684,6 @@
               "foreground": "#0e1116",
               "accent": "#055d20",
               "surface": "#ffffff"
-            },
-            {
-              "label": "GitHub Dark High Contrast",
-              "base": "dark",
-              "background": "#0a0c10",
-              "foreground": "#f0f3f6",
-              "accent": "#09b43a",
-              "surface": "#010409"
             }
           ]
         }
