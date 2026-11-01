@@ -99,7 +99,10 @@ window.addEventListener('message', (event) => {
     const { baseVersion, content } = m.params
     let error = window.__refuse
     if (!error && baseVersion !== window.__version) error = { code: 'conflict', message: 'the document changed' }
-    if (!error) window.__edits.push({ baseVersion, bytes: new Uint8Array(content.bytes) })
+    if (!error) {
+      window.__edits.push({ baseVersion, bytes: new Uint8Array(content.bytes) })
+      if (window.__echoEdits) window.__postBytes(new Uint8Array(content.bytes))
+    }
     frame().postMessage(error ? { orca: 1, kind: 'res', id: m.id, error } : { orca: 1, kind: 'res', id: m.id, result: null }, '*')
   }
   if (m && m.kind === 'res' && flushes.has(m.id)) { flushes.get(m.id)(m.error ?? null); flushes.delete(m.id) }

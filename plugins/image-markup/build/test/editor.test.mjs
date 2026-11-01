@@ -95,6 +95,37 @@ test('debounces edits, and Orca handing the saved bytes back keeps the session a
   await close()
 })
 
+test('an edit echoed before its acknowledgement never reloads the scene or drops a newer stroke', async () => {
+  const { page, frame, errors, close } = await open()
+  await page.evaluate(() => (window.__echoEdits = true))
+  // Hold a redundant decode open: drawing must keep working while the host echoes an edit.
+  await frame.evaluate(() => {
+    const decode = window.createImageBitmap
+    window.__decodeCalls = 0
+    window.__releaseDecode = null
+    window.createImageBitmap = async (...args) => {
+      window.__decodeCalls++
+      await new Promise((resolve) => (window.__releaseDecode = resolve))
+      return decode(...args)
+    }
+  })
+  await drag(page, frame, SIZE, [[100, 100], [200, 150]])
+  await flush(page)
+  await drag(page, frame, SIZE, [[300, 100], [400, 150]])
+  await frame.evaluate(() => window.__releaseDecode?.())
+  // Give an unnecessary decode time to finish and expose a reset of the live scene.
+  await frame.waitForTimeout(100)
+  assert.equal(await info(frame), '640 × 400 · PNG · 2 marks')
+  assert.equal(await frame.evaluate(() => window.__decodeCalls), 0, 'own edits do not decode again')
+  assert.equal(await flush(page), null)
+  assert.equal(readMarkup((await edits(page)).at(-1)).scene.shapes.length, 2)
+  await tool(frame, 'Undo')
+  assert.equal(await info(frame), '640 × 400 · PNG · 1 mark')
+  assert.equal(await flush(page), null)
+  assert.deepEqual(errors, [])
+  await close()
+})
+
 test('reopening a saved file restores editable shapes; clearing them saves the original byte for byte', async () => {
   const first = await open()
   await drag(first.page, first.frame, SIZE, [[100, 100], [200, 150]])

@@ -123,6 +123,7 @@ const s = {
   // Saving
   timer: undefined,
   committing: null,
+  inFlight: null, // recognize an edit echoed by Orca before applyEdit resolves
   urgent: false, // Orca is waiting on a flush: encode without yielding
   lastGesture: 0, // last wheel zoom or pan, so encoding can wait for the gesture to end
   awaitingDocument: false, // Orca refused an edit as stale; send again once its newer document arrives
@@ -488,6 +489,8 @@ async function commitLoop() {
       return
     }
     const version = s.version
+    const inFlight = { bitmap, bytes }
+    s.inFlight = inFlight
     try {
       await window.orca.document.applyEdit({ baseVersion: version, content: { kind: 'bytes', bytes: exactBuffer(bytes) } })
     } catch (error) {
@@ -500,6 +503,8 @@ async function commitLoop() {
       // the same file, send again against it; otherwise send once it arrives (onDocument).
       if (s.version === version) s.awaitingDocument = true
       continue
+    } finally {
+      if (s.inFlight === inFlight) s.inFlight = null
     }
     if (bitmap !== s.bitmap) return
     s.posted = shapes
@@ -633,8 +638,10 @@ async function onDocument(doc) {
   const bytes = new Uint8Array(doc.content.bytes)
   const readOnly = doc.readOnly === true
   // Orca hands back what this frame sent (after a save, or when the tab remounts the editor);
-  // keep the live session, with its undo history and selection.
-  if (s.bitmap && s.lastPosted && sameBytes(bytes, s.lastPosted)) {
+  // keep the live session, with its undo history and selection. The echo can arrive before
+  // applyEdit resolves, while lastPosted still holds the preceding scene's bytes.
+  const ownEdit = s.inFlight?.bitmap === s.bitmap && sameBytes(bytes, s.inFlight.bytes)
+  if (s.bitmap && ((s.lastPosted && sameBytes(bytes, s.lastPosted)) || ownEdit)) {
     // An image still decoding for an earlier document must not replace this newer one.
     loadToken++
     s.version = doc.version
