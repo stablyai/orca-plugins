@@ -133,7 +133,14 @@ function onLinkOpen(element, event, api, features) {
   if (isElementLink(link)) {
     api?.scrollToContent(link, { animate: true })
   } else if (features.openLinks && EXTERNAL_LINK.test(link)) {
-    window.orca.shell.openExternal(link).catch(() => {})
+    // Why the toast: otherwise a link Orca could not ask about (say, its window was hidden) does
+    // nothing at all. A cancelled prompt was the person's choice, so it shows nothing.
+    const couldNotAsk = () => api?.setToast({ message: "Orca couldn't ask to open this link", closable: true })
+    window.orca.shell.openExternal(link).then((result) => {
+      if (result?.opened === false && result.reason === 'consent-unavailable') {
+        couldNotAsk()
+      }
+    }, couldNotAsk)
   }
 }
 
