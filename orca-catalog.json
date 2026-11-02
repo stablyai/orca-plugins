@@ -2014,10 +2014,10 @@
           "images": {
             "cover": {
               "path": "assets/orca-image-markup/cover.jpg",
-              "alt": "A sunlit reading nook in Image Markup, with a red ellipse around the chair and an arrow pointing to it from a Cozy corner label",
-              "sha256": "ea539cfd028748d2d5f85de11ed124dc13a75fac6b2b65233a657bf5f43b22f3",
-              "width": 1600,
-              "height": 1000
+              "alt": "Illustration of an image editor with a red circle and arrow marking a blue mountain landscape",
+              "sha256": "dc08b0495ba1b71c825e3e52d8bd2c497ef1395e7dc0ed0a8869ba33f9804d1d",
+              "width": 1586,
+              "height": 992
             }
           }
         },
