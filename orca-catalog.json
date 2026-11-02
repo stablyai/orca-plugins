@@ -2010,7 +2010,16 @@
             "bmp",
             "avif"
           ],
-          "license": "MIT"
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "plugins/image-markup/images/cover.png",
+              "alt": "A sunlit reading nook in Image Markup, with a red ellipse around the chair and an arrow pointing to it from a Cozy corner label",
+              "sha256": "d65d52511a92986700ce6d7c5e1a3f53be5528aab1f3c9b6d0d30293ee1dbf43",
+              "width": 1600,
+              "height": 1000
+            }
+          }
         },
         {
           "version": "1.0.0",
