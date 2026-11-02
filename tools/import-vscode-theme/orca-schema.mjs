@@ -56,9 +56,17 @@ export async function loadOrcaSchema(orcaDir) {
   )
   const appTokens = new Set(artifact.PLUGIN_APP_THEME_TOKENS)
   const builtIns = builtInColors(orcaDir, appTokens)
-  // Why this marker: the Orca that added CSS fallbacks (stablyai/orca#36578) also moved the
-  // theme's base into the contrast check's second argument.
-  const cssFallback = artifact.pluginAppThemeCssFallback
+  // Why both places: the CSS fallbacks (stablyai/orca#36578) later moved to their own module.
+  const fallbacksModule = path.join(
+    orcaDir, 'src', 'shared', 'plugins', 'artifacts', 'plugin-theme-css-fallbacks.ts'
+  )
+  const cssFallback =
+    artifact.pluginAppThemeCssFallback ??
+    (existsSync(fallbacksModule)
+      ? loadPluginSchemaModule('artifacts/plugin-theme-css-fallbacks.ts').pluginAppThemeCssFallback
+      : undefined)
+  // Why by arity: the Orca with CSS fallbacks also moved the theme's base into the second argument.
+  const takesBase = safePluginThemeTokens.length >= 4
   return {
     appTokens,
     terminalKeys: terminal.TERMINAL_COLOR_KEYS,
@@ -77,7 +85,7 @@ export async function loadOrcaSchema(orcaDir) {
       return { ...builtIns[base], ...out }
     },
     gate: (tokens, base) =>
-      cssFallback
+      takesBase
         ? safePluginThemeTokens(tokens, base, builtIns[base], probe)
         : safePluginThemeTokens(tokens, builtIns[base], probe)
   }

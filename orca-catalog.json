@@ -2032,9 +2032,9 @@
       ],
       "releases": [
         {
-          "version": "1.0.1",
-          "commit": "51a8dbffd13289b284e204a9188b9ce3e27582b6",
-          "contentHash": "3c8ab23e9882d4c1388c3c87d5d29799213c0a0ad71d0fb95172b171724a2967",
+          "version": "1.0.2",
+          "commit": "1fe9ab8f3133f3712766c974aded306d648f483f",
+          "contentHash": "ae9b3d57fc686470a7a4186b11695e36ce7c44dab5be3d4615a67573cc86a60e",
           "execution": "sandboxed-ui",
           "minimumOrca": "1.4.245",
           "name": "Image Markup",
@@ -2063,16 +2063,16 @@
             "bmp",
             "avif"
           ],
-          "license": "MIT",
           "images": {
             "cover": {
-              "path": "assets/orca-image-markup/cover.jpg",
-              "alt": "Illustration of an image editor with a red circle and arrow marking a colorful mountain landscape",
-              "sha256": "dc810a420b3ef7ade06f891b702370bcb201c44721ae2d35c5b39556aca4ac51",
-              "width": 1586,
-              "height": 992
+              "path": "plugins/image-markup/images/cover.webp",
+              "alt": "A sunlit reading nook in Image Markup, with a red ellipse around the chair and an arrow pointing to it from a Cozy corner label",
+              "sha256": "45a43a6c45b04e0382050cb9c78f90a18cf3146cc79163d049c2fa6d082d7137",
+              "width": 1600,
+              "height": 1000
             }
-          }
+          },
+          "license": "MIT"
         },
         {
           "version": "1.0.0",
