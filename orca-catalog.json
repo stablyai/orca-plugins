@@ -2022,49 +2022,6 @@
           "license": "MIT"
         },
         {
-          "version": "1.0.1",
-          "commit": "51a8dbffd13289b284e204a9188b9ce3e27582b6",
-          "contentHash": "3c8ab23e9882d4c1388c3c87d5d29799213c0a0ad71d0fb95172b171724a2967",
-          "execution": "sandboxed-ui",
-          "minimumOrca": "1.4.245",
-          "name": "Image Markup",
-          "contributes": [
-            {
-              "kind": "customEditors",
-              "name": "Markup",
-              "detail": ".png, .jpg, .jpeg, .webp, .gif, .bmp, .avif"
-            }
-          ],
-          "fileTypes": [
-            "png",
-            "jpg",
-            "jpeg",
-            "webp",
-            "gif",
-            "bmp",
-            "avif"
-          ],
-          "editorFileTypes": [
-            "png",
-            "jpg",
-            "jpeg",
-            "webp",
-            "gif",
-            "bmp",
-            "avif"
-          ],
-          "license": "MIT",
-          "images": {
-            "cover": {
-              "path": "assets/orca-image-markup/cover.jpg",
-              "alt": "Illustration of an image editor with a red circle and arrow marking a colorful mountain landscape",
-              "sha256": "dc810a420b3ef7ade06f891b702370bcb201c44721ae2d35c5b39556aca4ac51",
-              "width": 1586,
-              "height": 992
-            }
-          }
-        },
-        {
           "version": "1.0.0",
           "commit": "69d51a36a51c166a4f1bbba363a79b6e84dffdc4",
           "contentHash": "6cf45b7036ce4acad969478bdb8fd7f46137689817d0570e4debe65cccdb4a82",
