@@ -3,7 +3,7 @@
   "id": "orca-image-markup",
   "publisher": "stablyai",
   "name": "Image Markup",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "execution": "sandboxed-ui",
   "description": "Mark up images in Orca with pen, arrow, box and text tools. Copy the result, or save it into the image with the original kept inside and the markup still editable.",
   "license": "MIT",
@@ -33,7 +33,7 @@
   },
   "capabilities": [],
   "cover": {
-    "path": "images/cover.png",
+    "path": "images/cover.webp",
     "alt": "A sunlit reading nook in Image Markup, with a red ellipse around the chair and an arrow pointing to it from a Cozy corner label"
   }
 }
