@@ -1980,8 +1980,8 @@
       "releases": [
         {
           "version": "1.0.1",
-          "commit": "decb9ebd3372d0a06b1156ec4f494f1f1c620bb7",
-          "contentHash": "3283e6de5bb2e3ac0ac2701bc7d3611e978cb34a68f27e7a3c5eeac2e2d92a0c",
+          "commit": "51a8dbffd13289b284e204a9188b9ce3e27582b6",
+          "contentHash": "3c8ab23e9882d4c1388c3c87d5d29799213c0a0ad71d0fb95172b171724a2967",
           "execution": "sandboxed-ui",
           "minimumOrca": "1.4.245",
           "name": "Image Markup",
