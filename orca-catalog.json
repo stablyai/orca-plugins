@@ -450,6 +450,59 @@
       ],
       "releases": [
         {
+          "version": "2.1.0",
+          "commit": "15ef4f57a08a5a6bdd2d63e9e4f31b09a9b56232",
+          "contentHash": "b2f787723df8a27691e89cf10a7b06d54c7e9997e334b2e0adecaa98c218e8ff",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "changelog": "Document sync on Orca's document session, with a three-way merge by element id: a background or grid change is no longer dropped, and different edits at the same element version are no longer taken as the same. One build for Orca's isolated frame; the 5.5 MB single-file fallback is gone. Needs Orca 1.4.248.",
+          "name": "Excalidraw",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw, .excalidraw.json"
+            },
+            {
+              "kind": "newFiles",
+              "name": "New Excalidraw drawing",
+              "detail": ".excalidraw"
+            }
+          ],
+          "fileTypes": [
+            "excalidraw"
+          ],
+          "editorFileTypes": [
+            "excalidraw"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/excalidraw/images/cover.png",
+              "alt": "A hand-drawn architecture sketch of a web app, API gateway, services and database open in the Excalidraw editor",
+              "sha256": "85cc3391dbb7569b271d8367da9232b9806e0ea0bf183112e34fb304260f327d",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/excalidraw/images/editing.png",
+                "alt": "A box in the sketch selected, with Excalidraw's stroke, fill and font options beside it",
+                "sha256": "cf14ff5105a08d396765816de52be2eba5a0076af20e72f667a29ffcc2521152",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/excalidraw/images/dark.png",
+                "alt": "The same sketch in Excalidraw's dark theme",
+                "sha256": "5db71c99c28336bf8b942de84a8327bf81d23b33d4eff7788c6efed0ebc463c9",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
+        {
           "version": "2.0.1",
           "commit": "9de79a66b32db9a975f007c16cd5f65daaa8066c",
           "contentHash": "6647fb7d4c5146ddf220566554577d6bc0efc3eda91cf5c6fe1dbf1113b4cebf",

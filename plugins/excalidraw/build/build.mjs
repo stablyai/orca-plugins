@@ -1,13 +1,12 @@
 // Builds ../editor (see README.md):
-//   assets/ (with assets/fonts/)  the multi-file editor, for Orca's isolated frames;
-//   index.html                    loads it, and inlines a single-file build for srcdoc frames.
-// Also writes ../THIRD_PARTY_NOTICES.txt, then runs test/subset-glue.test.mjs.
+//   assets/ (with assets/fonts/)  the editor as ES modules, for Orca's isolated editor frame;
+//   index.html                    the page that loads it.
+// Also writes ../THIRD_PARTY_NOTICES.txt, then runs the tests in test/.
 // Usage: npm ci --ignore-scripts && node build.mjs
 import { build } from 'esbuild'
 import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import vm from 'node:vm'
 import { SKIPPED_FONT_FAMILIES, adaptExcalidraw, evaluatesStrings } from './excalidraw-patches.mjs'
 
 const HERE = import.meta.dirname
@@ -43,29 +42,7 @@ const orcaFileAccess = {
   }
 }
 
-/** Stand-ins for code a srcdoc frame can never run; each would otherwise cost megabytes. */
-const srcdocStubs = {
-  name: 'srcdoc-stubs',
-  setup(context) {
-    // Why: inlined, every locale would load with the page; this editor runs in English.
-    context.onResolve({ filter: /^\.\/locales\/[\w-]+\.js$/ }, (args) =>
-      /^\.\/locales\/(en|percentages)-/.test(args.path) ? undefined : { path: 'locale', namespace: 'stub' }
-    )
-    // Why: font subsetting is 1.8 MB of WebAssembly, which the srcdoc CSP refuses to compile; exports
-    // then embed whole fonts instead of subsets.
-    context.onResolve({ filter: /^\.\/subset-(shared|worker)\.chunk\.js$/ }, (args) => ({
-      path: args.path.includes('worker') ? 'subset-worker' : 'subset-shared',
-      namespace: 'stub'
-    }))
-    context.onLoad({ filter: /.*/, namespace: 'stub' }, (args) => ({
-      contents: readFileSync(path.join(HERE, 'src', 'srcdoc', 'stubs', `${args.path}.js`), 'utf8'),
-      resolveDir: path.join(HERE, 'src', 'srcdoc', 'stubs'),
-      loader: 'js'
-    }))
-  }
-}
-
-const guestPatches = adaptExcalidraw('guest', EXCALIDRAW_DIST)
+const patches = adaptExcalidraw()
 const guest = await build({
   ...COMMON,
   entryPoints: { editor: path.join(HERE, 'src', 'main.js') },
@@ -74,22 +51,9 @@ const guest = await build({
   entryNames: 'assets/[name]-[hash]',
   chunkNames: 'assets/[name]-[hash]',
   format: 'esm',
-  define: { ...COMMON.define, __EDITOR_FRAME__: '"guest"' },
-  plugins: [orcaFileAccess, guestPatches.plugin]
+  plugins: [orcaFileAccess, patches.plugin]
 })
-guestPatches.check()
-
-const srcdocPatches = adaptExcalidraw('srcdoc', EXCALIDRAW_DIST)
-const srcdoc = await build({
-  ...COMMON,
-  entryPoints: [path.join(HERE, 'src', 'srcdoc', 'entry.js')],
-  outdir: path.join(HERE, 'out'),
-  format: 'iife',
-  define: { ...COMMON.define, __EDITOR_FRAME__: '"srcdoc"' },
-  loader: { '.woff2': 'dataurl' },
-  plugins: [srcdocStubs, orcaFileAccess, srcdocPatches.plugin]
-})
-srcdocPatches.check()
+patches.check()
 
 const relativeToEditor = (file) => path.relative(EDITOR, file).split(path.sep).join('/')
 const guestFile = (output) => `./${relativeToEditor(path.join(HERE, output))}`
@@ -102,19 +66,6 @@ const assets = {
   preload: entryOutput.imports.filter((chunk) => chunk.kind === 'import-statement').map((chunk) => guestFile(chunk.path))
 }
 
-// The single-file editor sits in <script type="text/plain">, which the HTML parser ends at `</script`.
-// Why the escapes: `<!--` then `<script` puts the parser in a state where `</script>` no longer ends
-// it. Every occurrence is inside a string or regex literal, where `\x3C` reads the same.
-const srcdocJs = srcdoc.outputFiles.find((file) => file.path.endsWith('.js')).text.replace(/<(!--|script)/gi, '\\x3C$1')
-const srcdocCss = srcdoc.outputFiles.find((file) => file.path.endsWith('.css')).text
-new vm.Script(srcdocJs)
-if (/<\/script/i.test(srcdocJs) || /<\/script|<!--/i.test(srcdocCss)) {
-  throw new Error('the single-file editor contains a closing script tag; it cannot be inlined')
-}
-const bootstrap = readFileSync(path.join(HERE, 'src', 'bootstrap.js'), 'utf8').replace(
-  '__ASSETS__',
-  JSON.stringify(assets)
-)
 const html = `<!doctype html>
 <html>
 <head>
@@ -123,14 +74,12 @@ const html = `<!doctype html>
 <style>
 ${readFileSync(path.join(HERE, 'src', 'page.css'), 'utf8').trim()}
 </style>
+<link rel="stylesheet" href="${assets.css}">
+${assets.preload.map((href) => `<link rel="modulepreload" href="${href}">`).join('\n')}
+<script type="module" src="${assets.entry}"></script>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/plain" id="orca-excalidraw-css">${srcdocCss}</script>
-<script type="text/plain" id="orca-excalidraw-js">${srcdocJs}</script>
-<script>
-${bootstrap.trim()}
-</script>
 </body>
 </html>
 `
@@ -139,13 +88,9 @@ const written = [{ file: path.join(EDITOR, 'index.html'), bytes: Buffer.from(htm
 for (const file of guest.outputFiles) {
   written.push({ file: file.path, bytes: Buffer.from(file.contents) })
 }
-const scripts = [
-  ['the single-file editor', srcdocJs],
-  ...guest.outputFiles.filter((file) => file.path.endsWith('.js')).map((file) => [relativeToEditor(file.path), file.text])
-]
-for (const [name, code] of scripts) {
-  if (evaluatesStrings(code)) {
-    throw new Error(`${name} evaluates strings as code (eval or Function), which the frame CSPs refuse`)
+for (const file of guest.outputFiles.filter((output) => output.path.endsWith('.js'))) {
+  if (evaluatesStrings(file.text)) {
+    throw new Error(`${relativeToEditor(file.path)} evaluates strings as code (eval or Function), which the frame CSP refuses`)
   }
 }
 rmSync(EDITOR, { recursive: true, force: true })
@@ -162,9 +107,9 @@ for (const family of readdirSync(path.join(EXCALIDRAW_DIST, 'fonts')).sort()) {
   }
 }
 
-// Notices: every npm package with code in either build, then the font subsetter and the fonts.
+// Notices: every npm package with code in the build, then the font subsetter and the fonts.
 const packages = new Map()
-for (const input of [...Object.keys(guest.metafile.inputs), ...Object.keys(srcdoc.metafile.inputs)]) {
+for (const input of Object.keys(guest.metafile.inputs)) {
   const at = input.lastIndexOf('node_modules/')
   if (at === -1) continue
   const name = /^(?:@[^/]+\/)?[^/]+/.exec(input.slice(at + 'node_modules/'.length))[0]
@@ -204,4 +149,4 @@ console.log(
   `editor/: ${written.length} files, ${totalBytes} bytes of HTML/JS/CSS (index.html ${written[0].bytes.length}), ` +
     `${packages.size} packages`
 )
-execFileSync(process.execPath, [path.join(HERE, 'test', 'subset-glue.test.mjs')], { stdio: 'inherit' })
+execFileSync(process.execPath, ['--test', 'test/*.test.mjs'], { cwd: HERE, stdio: 'inherit' })
