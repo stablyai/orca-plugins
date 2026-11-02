@@ -2013,9 +2013,9 @@
           "license": "MIT",
           "images": {
             "cover": {
-              "path": "plugins/image-markup/images/cover.png",
+              "path": "assets/orca-image-markup/cover.jpg",
               "alt": "A sunlit reading nook in Image Markup, with a red ellipse around the chair and an arrow pointing to it from a Cozy corner label",
-              "sha256": "d65d52511a92986700ce6d7c5e1a3f53be5528aab1f3c9b6d0d30293ee1dbf43",
+              "sha256": "ea539cfd028748d2d5f85de11ed124dc13a75fac6b2b65233a657bf5f43b22f3",
               "width": 1600,
               "height": 1000
             }
