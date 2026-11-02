@@ -2014,8 +2014,8 @@
           "images": {
             "cover": {
               "path": "assets/orca-image-markup/cover.jpg",
-              "alt": "Illustration of an image editor with a red circle and arrow marking a blue mountain landscape",
-              "sha256": "dc08b0495ba1b71c825e3e52d8bd2c497ef1395e7dc0ed0a8869ba33f9804d1d",
+              "alt": "Illustration of an image editor with a red circle and arrow marking a colorful mountain landscape",
+              "sha256": "dc810a420b3ef7ade06f891b702370bcb201c44721ae2d35c5b39556aca4ac51",
               "width": 1586,
               "height": 992
             }
