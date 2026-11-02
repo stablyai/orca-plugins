@@ -3,9 +3,6 @@
 
 const KEY = 'orca-excalidraw-library'
 
-/** Whether localStorage outlives this frame; a srcdoc frame only has an in-memory stand-in. */
-export const libraryPersists = window.origin !== 'null'
-
 /** The stored library, or null when there is none or it cannot be read. */
 export function readLibrary() {
   const saved = localStorage.getItem(KEY)
