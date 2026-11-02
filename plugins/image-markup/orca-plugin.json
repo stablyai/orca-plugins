@@ -16,12 +16,24 @@
       {
         "id": "markup",
         "title": "Markup",
-        "extensions": [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif"],
+        "extensions": [
+          ".png",
+          ".jpg",
+          ".jpeg",
+          ".webp",
+          ".gif",
+          ".bmp",
+          ".avif"
+        ],
         "entry": "editor/index.html",
         "priority": "default",
         "contentKind": "bytes"
       }
     ]
   },
-  "capabilities": []
+  "capabilities": [],
+  "cover": {
+    "path": "images/cover.png",
+    "alt": "A sunlit reading nook in Image Markup, with a red ellipse around the chair and an arrow pointing to it from a Cozy corner label"
+  }
 }
