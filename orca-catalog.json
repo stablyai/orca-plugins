@@ -2479,8 +2479,8 @@
       "releases": [
         {
           "version": "2.0.0",
-          "commit": "b9a1609e34e8939d0d4ac7269fd2b281c6af7a31",
-          "contentHash": "ad7070016cb53f68fa692b86ebc56dc431c98db5b580acd4e000ee0c21bc7a85",
+          "commit": "8332d28faf76e32bdf40da58f28c5a1be3f47dbe",
+          "contentHash": "6fbc5ecf3fddb18b6cec9ffdadb3718e390ef8d56317c8326039fa6f142fdd26",
           "execution": "sandboxed-ui",
           "minimumOrca": "1.4.248",
           "changelog": "SQL query console with results in the grid; sort, per-column filters and search for tables, views and query results; copy cells and rows; CSV export. Views show their rows. Still read-only. Needs Orca 1.4.248 and the desktop app; older Orca keeps 1.0.0.",
