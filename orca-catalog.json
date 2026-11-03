@@ -676,8 +676,8 @@
       "releases": [
         {
           "version": "2.0.0",
-          "commit": "b5fd20dac12c17e32a5ab4719c0c894bf2658bd1",
-          "contentHash": "f0782fb105bc83b3c99259ba6794538305e152ac6270dc70b870ba1b1662957f",
+          "commit": "d678e96719d41853286298e238dd7e2957ad784c",
+          "contentHash": "f96ab977f808d78480079274a58efd874cbad0fe3974433df18be2e8157b2849",
           "execution": "sandboxed-ui",
           "minimumOrca": "1.4.248",
           "changelog": "Editing: cell values and formulas, inserting and deleting rows and columns, clearing, paste, and undo and redo. Saves .xlsx, .xlsm and .ods in place, changing only what was edited, so styles, charts, comments and macros are kept. Formulas recalculate for common functions. An outside write merges with unsaved cell edits only when that is safe; otherwise the edits are set aside to reapply or discard. .xls and .xlsb open read-only. Needs Orca 1.4.248.",
