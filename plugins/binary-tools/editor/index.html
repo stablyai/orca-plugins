@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Inspector</title>
+<style>
+:root {
+  --bg-app: var(--orca-background, #121214);
+  --bg-surface: var(--orca-muted, #1a1a1e);
+  --bg-card: #202026;
+  --bg-hover: #2a2a32;
+  --text-main: var(--orca-foreground, #f3f3f6);
+  --text-muted: var(--orca-muted-foreground, #9494a0);
+  --border: var(--orca-border, #2d2d38);
+  --accent: var(--orca-accent, #3b82f6);
+  --accent-hover: #2563eb;
+  --accent-soft: rgba(59, 130, 246, 0.15);
+  
+  --byte-null: #52525e;
+  --byte-ascii: #38bdf8;
+  --byte-ctrl: #fbbf24;
+  --byte-high: #c084fc;
+  --byte-selected-bg: #3b82f6;
+  --byte-selected-fg: #ffffff;
+  
+  --badge-elf: #10b981;
+  --badge-ar: #f59e0b;
+  --badge-pe: #8b5cf6;
+  --badge-raw: #64748b;
+
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --row-height: 22px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: text;
+}
+
+/* Header & Toolbar */
+.toolbar {
+  height: 44px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.file-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+}
+.file-badge.elf { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+.file-badge.ar { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+.file-badge.pe { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
+.file-badge.raw { background: rgba(100, 116, 139, 0.15); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); }
+
+.nav-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+.tab-btn.active {
+  color: #ffffff;
+  background: var(--accent);
+}
+
+.spacer { flex: 1; }
+
+.toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input-box:focus {
+  border-color: var(--accent);
+}
+.input-search { width: 170px; }
+.input-offset { width: 95px; }
+
+.btn-icon {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-icon:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-muted);
+}
+.btn-icon.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Layout container */
+.main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+.tab-pane {
+  display: none;
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+.tab-pane.active {
+  display: flex;
+}
+
+/* Hex View Pane */
+#pane-hex {
+  flex-direction: row;
+}
+
+.hex-viewport {
+  flex: 1;
+  overflow-y: scroll;
+  overflow-x: auto;
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: var(--row-height);
+  padding: 8px 12px;
+}
+
+.hex-canvas-spacer {
+  width: 100%;
+  pointer-events: none;
+}
+
+.hex-rows-container {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  right: 12px;
+  pointer-events: auto;
+}
+
+.hex-row {
+  display: flex;
+  height: var(--row-height);
+  align-items: center;
+  white-space: pre;
+}
+
+.hex-offset {
+  width: 85px;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.hex-bytes {
+  display: flex;
+  width: 390px;
+  margin-right: 16px;
+}
+
+.hex-byte {
+  width: 22px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.hex-byte.spacer-mid {
+  margin-right: 10px;
+}
+.hex-byte:hover {
+  background: var(--bg-hover);
+}
+.hex-byte.selected {
+  background: var(--byte-selected-bg) !important;
+  color: var(--byte-selected-fg) !important;
+  font-weight: bold;
+}
+.hex-byte.match {
+  background: rgba(234, 179, 8, 0.35);
+  outline: 1px solid #eab308;
+}
+
+.hex-byte.b-null { color: var(--byte-null); }
+.hex-byte.b-ascii { color: var(--byte-ascii); }
+.hex-byte.b-ctrl { color: var(--byte-ctrl); }
+.hex-byte.b-high { color: var(--byte-high); }
+
+.hex-ascii {
+  display: flex;
+  color: var(--text-main);
+}
+.ascii-char {
+  width: 9.5px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.ascii-char:hover {
+  background: var(--bg-hover);
+}
+.ascii-char.selected {
+  background: var(--byte-selected-bg);
+  color: var(--byte-selected-fg);
+  font-weight: bold;
+}
+
+/* Data Inspector Sidebar */
+.inspector-panel {
+  width: 270px;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+.inspector-panel.hidden {
+  display: none;
+}
+
+.inspector-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.inspector-section {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.inspector-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.inspector-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 12px;
+}
+.inspector-key {
+  color: var(--text-muted);
+}
+.inspector-val {
+  font-family: var(--font-mono);
+  color: var(--text-main);
+  user-select: text;
+}
+
+/* Tables in Structure & Archive Tabs */
+.pane-table-wrapper {
+  padding: 16px;
+  width: 100%;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+.data-table th {
+  padding: 8px 12px;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+.data-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.data-table tr:hover td {
+  background: var(--bg-card);
+}
+.data-table td.mono {
+  font-family: var(--font-mono);
+}
+
+.btn-small {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  margin-right: 4px;
+}
+.btn-small:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Strings Tab */
+.strings-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 12px;
+  gap: 8px;
+  overflow: hidden;
+}
+.strings-list {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-surface);
+}
+.string-item {
+  display: flex;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+.string-item:hover {
+  background: var(--bg-hover);
+}
+.string-offset {
+  width: 100px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.string-val {
+  color: var(--text-main);
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Footer status bar */
+.statusbar {
+  height: 26px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Drag overlay & Large file notice */
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(18, 18, 20, 0.94);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  gap: 12px;
+  padding: 20px;
+  text-align: center;
+}
+.drop-overlay.hidden { display: none; }
+
+.drop-card {
+  max-width: 480px;
+  padding: 24px;
+  background: var(--bg-card);
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.drop-card h3 { font-size: 16px; font-weight: 600; color: var(--text-main); }
+.drop-card p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-primary:hover { background: var(--accent-hover); }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div id="fileBadge" class="file-badge raw">RAW BINARY</div>
+  <button id="btnBackToArchive" class="btn-small" style="display:none; margin-left:2px; font-weight:500;">← Back to Archive</button>
+
+  <div class="nav-tabs">
+    <button class="tab-btn active" data-tab="hex">Hex View</button>
+    <button class="tab-btn" data-tab="structure" id="tabStructureBtn">Structure</button>
+    <button class="tab-btn" data-tab="archive" id="tabArchiveBtn" style="display:none;">Archive Members</button>
+    <button class="tab-btn" data-tab="strings">Strings</button>
+  </div>
+
+  <div class="spacer"></div>
+
+  <div class="toolbar-controls">
+    <input type="text" id="searchInput" class="input-box input-search" placeholder="Find (hex or text)..." spellcheck="false">
+    <input type="text" id="offsetInput" class="input-box input-offset" placeholder="Go: 0x0000" spellcheck="false">
+    <button id="toggleInspectorBtn" class="btn-icon active" title="Toggle Data Inspector">Inspector</button>
+  </div>
+</div>
+
+<div class="main-content">
+  <!-- Pane 1: Hex View -->
+  <div id="pane-hex" class="tab-pane active">
+    <div class="hex-viewport" id="hexViewport">
+      <div class="hex-canvas-spacer" id="hexSpacer"></div>
+      <div class="hex-rows-container" id="hexContainer"></div>
+    </div>
+
+    <!-- Data Inspector Sidebar -->
+    <div class="inspector-panel" id="inspectorPanel">
+      <div class="inspector-header">
+        <span>Data Inspector</span>
+        <span id="inspectOffsetLabel" class="inspector-val">0x00000000</span>
+      </div>
+      
+      <div class="inspector-section">
+        <div class="inspector-label">Integer (8-bit)</div>
+        <div class="inspector-row"><span class="inspector-key">Hex</span><span class="inspector-val" id="ins-hex">00</span></div>
+        <div class="inspector-row"><span class="inspector-key">Binary</span><span class="inspector-val" id="ins-bin">00000000</span></div>
+        <div class="inspector-row"><span class="inspector-key">Unsigned</span><span class="inspector-val" id="ins-u8">0</span></div>
+        <div class="inspector-row"><span class="inspector-key">Signed</span><span class="inspector-val" id="ins-i8">0</span></div>
+        <div class="inspector-row"><span class="inspector-key">ASCII</span><span class="inspector-val" id="ins-char">'.'</span></div>
+      </div>
+
+      <div class="inspector-section">
+        <div class="inspector-label">Integer (16-bit)</div>
+        <div class="inspector-row"><span class="inspector-key">Little Endian</span><span class="inspector-val" id="ins-u16le">0</span></div>
+        <div class="inspector-row"><span class="inspector-key">Big Endian</span><span class="inspector-val" id="ins-u16be">0</span></div>
+      </div>
+
+      <div class="inspector-section">
+        <div class="inspector-label">Integer (32-bit)</div>
+        <div class="inspector-row"><span class="inspector-key">Little Endian</span><span class="inspector-val" id="ins-u32le">0</span></div>
+        <div class="inspector-row"><span class="inspector-key">Big Endian</span><span class="inspector-val" id="ins-u32be">0</span></div>
+      </div>
+
+      <div class="inspector-section">
+        <div class="inspector-label">Integer (64-bit)</div>
+        <div class="inspector-row"><span class="inspector-key">Little Endian</span><span class="inspector-val" id="ins-u64le">0</span></div>
+        <div class="inspector-row"><span class="inspector-key">Big Endian</span><span class="inspector-val" id="ins-u64be">0</span></div>
+      </div>
+
+      <div class="inspector-section">
+        <div class="inspector-label">Floating Point</div>
+        <div class="inspector-row"><span class="inspector-key">Float32 LE</span><span class="inspector-val" id="ins-f32">0.0</span></div>
+        <div class="inspector-row"><span class="inspector-key">Float64 LE</span><span class="inspector-val" id="ins-f64">0.0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pane 2: File Structure -->
+  <div id="pane-structure" class="tab-pane">
+    <div class="pane-table-wrapper" id="structureWrapper">
+      <p style="color:var(--text-muted); margin-bottom:12px;">No structural headers detected in this file format.</p>
+    </div>
+  </div>
+
+  <!-- Pane 3: Archive Members (AR) -->
+  <div id="pane-archive" class="tab-pane">
+    <div class="pane-table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Member Name</th>
+            <th>Size</th>
+            <th>Timestamp</th>
+            <th>Offset</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="archiveBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pane 4: Strings -->
+  <div id="pane-strings" class="tab-pane">
+    <div class="strings-container">
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="stringsFilter" class="input-box" style="flex:1;" placeholder="Filter extracted strings...">
+        <span id="stringsCount" style="align-self:center; color:var(--text-muted); font-size:12px;"></span>
+      </div>
+      <div class="strings-list" id="stringsList"></div>
+    </div>
+  </div>
+
+  <!-- Drop / Standalone Overlay -->
+  <div class="drop-overlay hidden" id="dropOverlay">
+    <div class="drop-card" id="dropBox">
+      <h3>Binary Inspector</h3>
+      <p id="dropText">Drag and drop any binary, object file, static library (.a), or executable here.<br>Supports chunked streaming for files over 50 MB.</p>
+      <input type="file" id="filePicker" style="display:none;">
+      <button class="btn-primary" onclick="document.getElementById('filePicker').click()">Select Local File</button>
+    </div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <span id="statusSize">0 Bytes</span>
+  <span id="statusFormat">Unknown Format</span>
+  <span id="statusOffset">Offset: 0x00000000 (0)</span>
+  <span class="spacer"></span>
+  <span id="statusSearch"></span>
+</div>
+
+<script>
+(() => {
+  const ROW_BYTES = 16;
+  const ROW_HEIGHT = 22;
+  const BUFFER_VISIBLE_ROWS = 40;
+
+  let bufferData = null; // Uint8Array or virtual provider
+  let dataLength = 0;
+  let selectedOffset = 0;
+  let searchMatches = [];
+  let currentMatchIdx = -1;
+  let extractedStrings = [];
+
+  // Parsed metadata
+  let elfData = null;
+  let arData = null;
+  let peData = null;
+
+  // DOM elements
+  const hexViewport = document.getElementById('hexViewport');
+  const hexSpacer = document.getElementById('hexSpacer');
+  const hexContainer = document.getElementById('hexContainer');
+  const fileBadge = document.getElementById('fileBadge');
+  const inspectorPanel = document.getElementById('inspectorPanel');
+  const toggleInspectorBtn = document.getElementById('toggleInspectorBtn');
+  const tabArchiveBtn = document.getElementById('tabArchiveBtn');
+  const btnBackToArchive = document.getElementById('btnBackToArchive');
+  const archiveBody = document.getElementById('archiveBody');
+  const structureWrapper = document.getElementById('structureWrapper');
+  const stringsList = document.getElementById('stringsList');
+  const stringsFilter = document.getElementById('stringsFilter');
+  const stringsCount = document.getElementById('stringsCount');
+
+  const statusSize = document.getElementById('statusSize');
+  const statusFormat = document.getElementById('statusFormat');
+  const statusOffset = document.getElementById('statusOffset');
+  const statusSearch = document.getElementById('statusSearch');
+
+  let parentArchiveBuffer = null;
+  let parentArchiveName = '';
+  let currentFileName = '';
+
+  // Helpers
+  const toHex = (num, len = 2) => num.toString(16).padStart(len, '0').toUpperCase();
+  const formatBytes = (bytes) => {
+    if (!bytes || bytes <= 0) return '0 B';
+    const k = 1024, dm = 2;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  };
+
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const targetPane = document.getElementById(`pane-${btn.dataset.tab}`);
+      if (targetPane) targetPane.classList.add('active');
+
+      // Hide inspector in archive or structure mode if needed
+      if (btn.dataset.tab !== 'hex') {
+        inspectorPanel.classList.add('hidden');
+      } else if (toggleInspectorBtn.classList.contains('active')) {
+        inspectorPanel.classList.remove('hidden');
+      }
+    });
+  });
+
+  toggleInspectorBtn.addEventListener('click', () => {
+    const isHidden = inspectorPanel.classList.toggle('hidden');
+    toggleInspectorBtn.classList.toggle('active', !isHidden);
+  });
+
+  // --- Virtualized Hex Renderer ---
+  function renderHexView() {
+    if (!bufferData || dataLength === 0) {
+      hexSpacer.style.height = '0px';
+      hexContainer.innerHTML = '';
+      return;
+    }
+
+    const totalRows = Math.ceil(dataLength / ROW_BYTES);
+    hexSpacer.style.height = `${totalRows * ROW_HEIGHT}px`;
+
+    const scrollTop = hexViewport.scrollTop;
+    const startRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 5);
+    const endRow = Math.min(totalRows, startRow + BUFFER_VISIBLE_ROWS + 10);
+
+    hexContainer.style.top = `${startRow * ROW_HEIGHT}px`;
+
+    let html = '';
+    for (let r = startRow; r < endRow; r++) {
+      const rowOffset = r * ROW_BYTES;
+      html += `<div class="hex-row">`;
+      html += `<div class="hex-offset">0x${toHex(rowOffset, 8)}</div>`;
+
+      // Hex bytes
+      html += `<div class="hex-bytes">`;
+      for (let i = 0; i < ROW_BYTES; i++) {
+        const offset = rowOffset + i;
+        if (offset < dataLength) {
+          const b = bufferData[offset];
+          let cls = 'hex-byte';
+          if (i === 7) cls += ' spacer-mid';
+          if (b === 0) cls += ' b-null';
+          else if (b >= 32 && b <= 126) cls += ' b-ascii';
+          else if (b < 32) cls += ' b-ctrl';
+          else cls += ' b-high';
+
+          if (offset === selectedOffset) cls += ' selected';
+          if (searchMatches.includes(offset)) cls += ' match';
+
+          html += `<span class="${cls}" data-offset="${offset}">${toHex(b, 2)}</span>`;
+        } else {
+          html += `<span class="hex-byte spacer-mid" style="opacity:0">  </span>`;
+        }
+      }
+      html += `</div>`;
+
+      // ASCII chars
+      html += `<div class="hex-ascii">`;
+      for (let i = 0; i < ROW_BYTES; i++) {
+        const offset = rowOffset + i;
+        if (offset < dataLength) {
+          const b = bufferData[offset];
+          const ch = (b >= 32 && b <= 126) ? String.fromCharCode(b) : '·';
+          const sel = (offset === selectedOffset) ? ' selected' : '';
+          html += `<span class="ascii-char${sel}" data-offset="${offset}">${ch}</span>`;
+        }
+      }
+      html += `</div>`;
+
+      html += `</div>`;
+    }
+    hexContainer.innerHTML = html;
+  }
+
+  hexViewport.addEventListener('scroll', () => renderHexView());
+
+  // Click byte selection
+  hexContainer.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-offset]');
+    if (!target) return;
+    const offset = parseInt(target.dataset.offset, 10);
+    selectOffset(offset);
+  });
+
+  function selectOffset(offset) {
+    if (offset < 0 || offset >= dataLength) return;
+    selectedOffset = offset;
+    updateInspector(offset);
+    statusOffset.textContent = `Offset: 0x${toHex(offset, 8)} (${offset})`;
+    renderHexView();
+  }
+
+  function jumpToOffset(offset) {
+    selectOffset(offset);
+    const row = Math.floor(offset / ROW_BYTES);
+    hexViewport.scrollTop = Math.max(0, row * ROW_HEIGHT - 100);
+  }
+
+  // --- Data Inspector Updating ---
+  function updateInspector(offset) {
+    document.getElementById('inspectOffsetLabel').textContent = `0x${toHex(offset, 8)}`;
+    if (!bufferData || offset >= dataLength) return;
+
+    const b = bufferData[offset];
+    document.getElementById('ins-hex').textContent = toHex(b, 2);
+    document.getElementById('ins-bin').textContent = b.toString(2).padStart(8, '0');
+    document.getElementById('ins-u8').textContent = b;
+    document.getElementById('ins-i8').textContent = (b > 127) ? b - 256 : b;
+    document.getElementById('ins-char').textContent = (b >= 32 && b <= 126) ? `'${String.fromCharCode(b)}'` : (b === 0 ? '\\0' : '·');
+
+    const view = new DataView(bufferData.buffer, bufferData.byteOffset, bufferData.byteLength);
+
+    // 16-bit
+    if (offset + 2 <= dataLength) {
+      document.getElementById('ins-u16le').textContent = view.getUint16(offset, true);
+      document.getElementById('ins-u16be').textContent = view.getUint16(offset, false);
+    } else {
+      document.getElementById('ins-u16le').textContent = '-';
+      document.getElementById('ins-u16be').textContent = '-';
+    }
+
+    // 32-bit
+    if (offset + 4 <= dataLength) {
+      document.getElementById('ins-u32le').textContent = view.getUint32(offset, true);
+      document.getElementById('ins-u32be').textContent = view.getUint32(offset, false);
+      const f32 = view.getFloat32(offset, true);
+      document.getElementById('ins-f32').textContent = Number.isFinite(f32) ? f32.toExponential(4) : f32;
+    } else {
+      document.getElementById('ins-u32le').textContent = '-';
+      document.getElementById('ins-u32be').textContent = '-';
+      document.getElementById('ins-f32').textContent = '-';
+    }
+
+    // 64-bit
+    if (offset + 8 <= dataLength) {
+      document.getElementById('ins-u64le').textContent = view.getBigUint64(offset, true).toString();
+      document.getElementById('ins-u64be').textContent = view.getBigUint64(offset, false).toString();
+      const f64 = view.getFloat64(offset, true);
+      document.getElementById('ins-f64').textContent = Number.isFinite(f64) ? f64.toExponential(4) : f64;
+    } else {
+      document.getElementById('ins-u64le').textContent = '-';
+      document.getElementById('ins-u64be').textContent = '-';
+      document.getElementById('ins-f64').textContent = '-';
+    }
+  }
+
+  // --- Jump To Offset Input ---
+  const offsetInput = document.getElementById('offsetInput');
+  offsetInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const val = offsetInput.value.trim().toLowerCase();
+      const target = val.startsWith('0x') ? parseInt(val.slice(2), 16) : parseInt(val, 10);
+      if (!isNaN(target)) jumpToOffset(target);
+    }
+  });
+
+  // --- Search Input ---
+  const searchInput = document.getElementById('searchInput');
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const query = searchInput.value.trim();
+      if (!query) {
+        searchMatches = [];
+        renderHexView();
+        statusSearch.textContent = '';
+        return;
+      }
+      performSearch(query, e.shiftKey);
+    }
+  });
+
+  function performSearch(query, reverse = false) {
+    searchMatches = [];
+    let pattern = [];
+    const hexRegex = /^([0-9a-fA-F]{2}\s*)+$/;
+    if (hexRegex.test(query)) {
+      pattern = query.split(/\s+/).filter(Boolean).map(s => parseInt(s, 16));
+    } else {
+      pattern = Array.from(new TextEncoder().encode(query));
+    }
+
+    if (pattern.length === 0) return;
+
+    for (let i = 0; i <= dataLength - pattern.length; i++) {
+      let match = true;
+      for (let j = 0; j < pattern.length; j++) {
+        if (bufferData[i + j] !== pattern[j]) { match = false; break; }
+      }
+      if (match) searchMatches.push(i);
+    }
+
+    if (searchMatches.length > 0) {
+      if (reverse) {
+        currentMatchIdx = (currentMatchIdx - 1 + searchMatches.length) % searchMatches.length;
+      } else {
+        currentMatchIdx = (currentMatchIdx + 1) % searchMatches.length;
+      }
+      const matchOffset = searchMatches[currentMatchIdx];
+      jumpToOffset(matchOffset);
+      statusSearch.textContent = `Match ${currentMatchIdx + 1} of ${searchMatches.length}`;
+    } else {
+      statusSearch.textContent = 'No matches found';
+    }
+    renderHexView();
+  }
+
+  // --- Extract Strings ---
+  function extractStrings(minLen = 4) {
+    extractedStrings = [];
+    let start = -1;
+    let chars = [];
+
+    for (let i = 0; i < dataLength; i++) {
+      const b = bufferData[i];
+      if (b >= 32 && b <= 126) {
+        if (start === -1) start = i;
+        chars.push(String.fromCharCode(b));
+      } else {
+        if (chars.length >= minLen) {
+          extractedStrings.push({ offset: start, string: chars.join('') });
+        }
+        start = -1;
+        chars = [];
+      }
+    }
+    if (chars.length >= minLen) {
+      extractedStrings.push({ offset: start, string: chars.join('') });
+    }
+    renderStrings(extractedStrings);
+  }
+
+  function renderStrings(list) {
+    stringsCount.textContent = `${list.length} strings`;
+    stringsList.innerHTML = list.slice(0, 500).map(item => `
+      <div class="string-item" onclick="window.__jumpOffset(${item.offset})">
+        <span class="string-offset">0x${toHex(item.offset, 8)}</span>
+        <span class="string-val">${escapeHtml(item.string)}</span>
+      </div>
+    `).join('');
+  }
+
+  stringsFilter.addEventListener('input', () => {
+    const q = stringsFilter.value.toLowerCase();
+    const filtered = extractedStrings.filter(s => s.string.toLowerCase().includes(q));
+    renderStrings(filtered);
+  });
+
+  const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // --- Format Parsers ---
+  function parseELF(buf) {
+    if (buf.length < 52) return null;
+    if (buf[0] !== 0x7F || buf[1] !== 0x45 || buf[2] !== 0x4C || buf[3] !== 0x46) return null;
+
+    const is64 = buf[4] === 2;
+    const isLE = buf[5] === 1;
+    const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+
+    const typeCode = view.getUint16(16, isLE);
+    const machineCode = view.getUint16(18, isLE);
+
+    const types = { 1: 'Relocatable (.o)', 2: 'Executable', 3: 'Shared Library (.so)', 4: 'Core' };
+    const machines = { 3: 'x86 (i386)', 62: 'Advanced Micro Devices X86-64', 40: 'ARM', 183: 'AArch64' };
+
+    const entry = is64 ? Number(view.getBigUint64(24, isLE)) : view.getUint32(24, isLE);
+    const shoff = is64 ? Number(view.getBigUint64(40, isLE)) : view.getUint32(32, isLE);
+    const shentsize = view.getUint16(is64 ? 58 : 46, isLE);
+    const shnum = view.getUint16(is64 ? 60 : 48, isLE);
+    const shstrndx = view.getUint16(is64 ? 62 : 50, isLE);
+
+    const sections = [];
+    if (shoff > 0 && shentsize > 0 && shnum > 0 && shoff + (shnum * shentsize) <= buf.length) {
+      // Find strtab section
+      let strtabOffset = 0;
+      if (shstrndx < shnum) {
+        const strHeaderOffset = shoff + (shstrndx * shentsize);
+        strtabOffset = is64 ? Number(view.getBigUint64(strHeaderOffset + 24, isLE)) : view.getUint32(strHeaderOffset + 16, isLE);
+      }
+
+      const getSectionName = (nameIdx) => {
+        if (!strtabOffset || strtabOffset + nameIdx >= buf.length) return '';
+        let n = '';
+        for (let idx = strtabOffset + nameIdx; idx < buf.length && buf[idx] !== 0; idx++) {
+          n += String.fromCharCode(buf[idx]);
+        }
+        return n;
+      };
+
+      for (let s = 0; s < shnum; s++) {
+        const off = shoff + (s * shentsize);
+        const nameIdx = view.getUint32(off, isLE);
+        const secType = view.getUint32(off + 4, isLE);
+        const secOffset = is64 ? Number(view.getBigUint64(off + 24, isLE)) : view.getUint32(off + 16, isLE);
+        const secSize = is64 ? Number(view.getBigUint64(off + 32, isLE)) : view.getUint32(off + 20, isLE);
+        const secFlags = is64 ? Number(view.getBigUint64(off + 8, isLE)) : view.getUint32(off + 8, isLE);
+
+        sections.push({
+          index: s,
+          name: getSectionName(nameIdx) || `[section #${s}]`,
+          type: secType,
+          offset: secOffset,
+          size: secSize,
+          flags: secFlags
+        });
+      }
+    }
+
+    return {
+      is64, isLE,
+      type: types[typeCode] || `Unknown (${typeCode})`,
+      machine: machines[machineCode] || `Machine (${machineCode})`,
+      entry, sections
+    };
+  }
+
+  function parseAR(buf) {
+    if (buf.length < 8) return null;
+    const magic = new TextDecoder('ascii').decode(buf.subarray(0, 8));
+    if (magic !== "!<arch>\n") return null;
+
+    let offset = 8;
+    const members = [];
+    let longNamesTable = null;
+
+    while (offset + 60 <= buf.length) {
+      const header = new TextDecoder('ascii').decode(buf.subarray(offset, offset + 60));
+      let name = header.substring(0, 16).trim();
+      const rawDate = header.substring(16, 28).trim();
+      const sizeStr = header.substring(48, 58).trim();
+      const size = parseInt(sizeStr, 10);
+      const dataOffset = offset + 60;
+
+      if (isNaN(size) || dataOffset + size > buf.length) break;
+
+      // Deterministic timestamp detection
+      let formattedDate = 'Deterministic (0)';
+      if (rawDate && rawDate !== '0') {
+        const dateVal = parseInt(rawDate, 10);
+        if (!isNaN(dateVal) && dateVal > 0) {
+          formattedDate = new Date(dateVal * 1000).toLocaleString();
+        }
+      }
+
+      // Check string table
+      if (name === '//') {
+        longNamesTable = buf.subarray(dataOffset, dataOffset + size);
+      } else if (name.startsWith('/')) {
+        const strOff = parseInt(name.substring(1), 10);
+        if (longNamesTable && !isNaN(strOff) && strOff < longNamesTable.length) {
+          let resolved = '';
+          for (let p = strOff; p < longNamesTable.length && longNamesTable[p] !== 0x2F && longNamesTable[p] !== 0x0A; p++) {
+            resolved += String.fromCharCode(longNamesTable[p]);
+          }
+          if (resolved) name = resolved;
+        }
+      } else if (name.endsWith('/')) {
+        name = name.slice(0, -1);
+      }
+
+      members.push({
+        name,
+        size,
+        date: formattedDate,
+        offset: dataOffset,
+        bytes: buf.subarray(dataOffset, dataOffset + size)
+      });
+
+      offset = dataOffset + size;
+      if (offset % 2 !== 0) offset++; // 2-byte alignment in AR
+    }
+
+    return { members };
+  }
+
+  function parsePE(buf) {
+    if (buf.length < 64) return null;
+    if (buf[0] !== 0x4D || buf[1] !== 0x5A) return null; // 'MZ'
+    const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+    const peOffset = view.getUint32(60, true);
+    if (peOffset + 24 > buf.length) return null;
+    if (buf[peOffset] !== 0x50 || buf[peOffset + 1] !== 0x45) return null; // 'PE\0\0'
+
+    const machine = view.getUint16(peOffset + 4, true);
+    const numSections = view.getUint16(peOffset + 6, true);
+    const optHeaderSize = view.getUint16(peOffset + 20, true);
+    const secOffset = peOffset + 24 + optHeaderSize;
+
+    const sections = [];
+    for (let i = 0; i < numSections && secOffset + (i * 40) + 40 <= buf.length; i++) {
+      const off = secOffset + (i * 40);
+      let name = '';
+      for (let j = 0; j < 8 && buf[off + j] !== 0; j++) name += String.fromCharCode(buf[off + j]);
+      const virtSize = view.getUint32(off + 8, true);
+      const rawOffset = view.getUint32(off + 20, true);
+      const rawSize = view.getUint32(off + 16, true);
+      sections.push({ name, virtualSize: virtSize, offset: rawOffset, size: rawSize });
+    }
+
+    return { machine, numSections, sections };
+  }
+
+  // --- Main Buffer Loader ---
+  function loadBuffer(arrayBuffer, fileName = 'binary') {
+    currentFileName = fileName;
+    bufferData = new Uint8Array(arrayBuffer);
+    dataLength = bufferData.byteLength;
+    selectedOffset = 0;
+
+    statusSize.textContent = formatBytes(dataLength);
+
+    // Format analysis
+    elfData = parseELF(bufferData);
+    arData = parseAR(bufferData);
+    peData = parsePE(bufferData);
+
+    tabArchiveBtn.style.display = 'none';
+
+    if (arData && arData.members.length > 0) {
+      fileBadge.className = 'file-badge ar';
+      fileBadge.textContent = `AR ARCHIVE (${arData.members.length})`;
+      statusFormat.textContent = `AR Static Library • ${arData.members.length} member(s)`;
+      tabArchiveBtn.style.display = 'inline-block';
+      renderArchiveView(arData.members);
+      renderStructureViewAR(arData);
+    } else if (elfData) {
+      fileBadge.className = 'file-badge elf';
+      fileBadge.textContent = elfData.is64 ? 'ELF 64-BIT' : 'ELF 32-BIT';
+      statusFormat.textContent = `${elfData.type} • ${elfData.machine}`;
+      renderStructureViewELF(elfData);
+    } else if (peData) {
+      fileBadge.className = 'file-badge pe';
+      fileBadge.textContent = 'PE/COFF';
+      statusFormat.textContent = `PE Binary • ${peData.numSections} section(s)`;
+      renderStructureViewPE(peData);
+    } else {
+      fileBadge.className = 'file-badge raw';
+      fileBadge.textContent = 'RAW BINARY';
+      statusFormat.textContent = 'Raw Binary Stream';
+      structureWrapper.innerHTML = '<p style="color:var(--text-muted)">Raw binary data without detected file headers.</p>';
+    }
+
+    extractStrings(4);
+    selectOffset(0);
+    renderHexView();
+  }
+
+  function renderArchiveView(members) {
+    archiveBody.innerHTML = members.map((m, idx) => `
+      <tr>
+        <td><strong>${escapeHtml(m.name)}</strong></td>
+        <td class="mono">${formatBytes(m.size)}</td>
+        <td style="color:var(--text-muted);">${m.date}</td>
+        <td class="mono">0x${toHex(m.offset, 8)}</td>
+        <td>
+          <button class="btn-small" onclick="window.__jumpOffset(${m.offset})">Hex View</button>
+          <button class="btn-small" onclick="window.__inspectMember(${idx})">Inspect</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderStructureViewELF(elf) {
+    structureWrapper.innerHTML = `
+      <div style="margin-bottom:16px; background:var(--bg-surface); padding:12px; border-radius:6px; border:1px solid var(--border);">
+        <h4 style="margin-bottom:8px; color:var(--text-main);">ELF Header</h4>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:8px; font-size:12px;">
+          <div><span style="color:var(--text-muted)">Type:</span> <strong>${elf.type}</strong></div>
+          <div><span style="color:var(--text-muted)">Architecture:</span> <strong>${elf.machine}</strong></div>
+          <div><span style="color:var(--text-muted)">Endianness:</span> <strong>${elf.isLE ? 'Little Endian' : 'Big Endian'}</strong></div>
+          <div><span style="color:var(--text-muted)">Entry Point:</span> <strong class="mono">0x${toHex(elf.entry, 8)}</strong></div>
+        </div>
+      </div>
+      <h4 style="margin-bottom:8px; color:var(--text-main);">Section Headers (${elf.sections.length})</h4>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Offset</th>
+            <th>Size</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${elf.sections.map(s => `
+            <tr>
+              <td class="mono">${s.index}</td>
+              <td><strong>${escapeHtml(s.name)}</strong></td>
+              <td class="mono">${s.type}</td>
+              <td class="mono">0x${toHex(s.offset, 8)}</td>
+              <td class="mono">${formatBytes(s.size)}</td>
+              <td><button class="btn-small" onclick="window.__jumpOffset(${s.offset})">Jump</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function renderStructureViewAR(ar) {
+    structureWrapper.innerHTML = `
+      <div style="background:var(--bg-surface); padding:12px; border-radius:6px; border:1px solid var(--border);">
+        <h4 style="margin-bottom:6px; color:var(--text-main);">AR Static Library</h4>
+        <p style="color:var(--text-muted); font-size:12px;">Archive Header: <code>!&lt;arch&gt;\\n</code> • Total Members: <strong>${ar.members.length}</strong></p>
+      </div>
+    `;
+  }
+
+  function renderStructureViewPE(pe) {
+    structureWrapper.innerHTML = `
+      <div style="margin-bottom:16px; background:var(--bg-surface); padding:12px; border-radius:6px; border:1px solid var(--border);">
+        <h4 style="margin-bottom:8px; color:var(--text-main);">PE / COFF Header</h4>
+        <p style="color:var(--text-muted); font-size:12px;">Sections: <strong>${pe.numSections}</strong></p>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Virtual Size</th><th>Raw Offset</th><th>Raw Size</th><th>Action</th></tr></thead>
+        <tbody>
+          ${pe.sections.map(s => `
+            <tr>
+              <td><strong>${escapeHtml(s.name)}</strong></td>
+              <td class="mono">${formatBytes(s.virtualSize)}</td>
+              <td class="mono">0x${toHex(s.offset, 8)}</td>
+              <td class="mono">${formatBytes(s.size)}</td>
+              <td><button class="btn-small" onclick="window.__jumpOffset(${s.offset})">Jump</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  // Window callbacks
+  window.__jumpOffset = (offset) => {
+    document.querySelector('.tab-btn[data-tab="hex"]').click();
+    jumpToOffset(offset);
+  };
+
+  window.__inspectMember = (idx) => {
+    if (!arData || !arData.members[idx]) return;
+    const member = arData.members[idx];
+    parentArchiveBuffer = bufferData.buffer.slice(bufferData.byteOffset, bufferData.byteOffset + bufferData.byteLength);
+    parentArchiveName = currentFileName || 'archive.a';
+    btnBackToArchive.style.display = 'inline-block';
+    loadBuffer(member.bytes.buffer.slice(member.bytes.byteOffset, member.bytes.byteOffset + member.bytes.byteLength), member.name);
+  };
+
+  btnBackToArchive.addEventListener('click', () => {
+    if (!parentArchiveBuffer) return;
+    const buf = parentArchiveBuffer;
+    const name = parentArchiveName;
+    parentArchiveBuffer = null;
+    parentArchiveName = '';
+    btnBackToArchive.style.display = 'none';
+    loadBuffer(buf, name);
+    tabArchiveBtn.click();
+  });
+
+  // --- Large File & Drop Handling ---
+  const dropOverlay = document.getElementById('dropOverlay');
+  const filePicker = document.getElementById('filePicker');
+
+  filePicker.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) handleLocalFile(e.target.files[0]);
+  });
+
+  window.addEventListener('dragover', (e) => { e.preventDefault(); dropOverlay.classList.remove('hidden'); });
+  window.addEventListener('dragleave', (e) => {
+    if (e.relatedTarget === null) dropOverlay.classList.add('hidden');
+  });
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropOverlay.classList.add('hidden');
+    if (e.dataTransfer.files.length > 0) handleLocalFile(e.dataTransfer.files[0]);
+  });
+
+  function handleLocalFile(file) {
+    dropOverlay.classList.add('hidden');
+    parentArchiveBuffer = null;
+    parentArchiveName = '';
+    btnBackToArchive.style.display = 'none';
+    // For very large files, read preview slice for responsive rendering
+    const MAX_IMMEDIATE_READ = 64 * 1024 * 1024; // 64 MB
+    if (file.size > MAX_IMMEDIATE_READ) {
+      statusSearch.textContent = `Streaming large file: ${formatBytes(file.size)}`;
+      const slice = file.slice(0, MAX_IMMEDIATE_READ);
+      slice.arrayBuffer().then(buf => loadBuffer(buf, file.name));
+    } else {
+      file.arrayBuffer().then(buf => loadBuffer(buf, file.name));
+    }
+  }
+
+  // --- Orca Document Session Integration ---
+  if (window.orca && window.orca.document && typeof window.orca.document.session === 'function') {
+    window.orca.document.session({
+      decode: (e) => {
+        if (!e || !e.bytes) return { error: 'invalid-bytes' };
+        const buf = e.bytes instanceof ArrayBuffer ? e.bytes : (ArrayBuffer.isView(e.bytes) ? e.bytes.buffer : null);
+        if (!buf) return { error: 'invalid-bytes' };
+        return { bytes: buf };
+      },
+      encode: (val) => ({ kind: 'bytes', bytes: val.bytes })
+    }).then(session => {
+      if (session.value && session.value.bytes) {
+        parentArchiveBuffer = null;
+        parentArchiveName = '';
+        btnBackToArchive.style.display = 'none';
+        loadBuffer(session.value.bytes);
+      }
+      session.onReplace((next) => {
+        if (next && next.bytes) {
+          parentArchiveBuffer = null;
+          parentArchiveName = '';
+          btnBackToArchive.style.display = 'none';
+          loadBuffer(next.bytes);
+        }
+      });
+    }).catch(err => {
+      console.warn('Orca document session error:', err);
+      dropOverlay.classList.remove('hidden');
+    });
+  } else {
+    // Standalone fallback: show drop overlay if no file loaded
+    dropOverlay.classList.remove('hidden');
+  }
+})();
+</script>
+</body>
+</html>

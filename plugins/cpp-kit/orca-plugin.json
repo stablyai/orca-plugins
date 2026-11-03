@@ -1,0 +1,49 @@
+{
+  "manifestVersion": 2,
+  "id": "orca-cpp-kit",
+  "publisher": "stablyai",
+  "name": "C/C++ & CMake Kit",
+  "version": "1.0.2",
+  "execution": "data",
+  "description": "Modern C/C++ support including inline/template headers (.ipp, .inl, .tpp, .tcc, .ixx) and full CMake language syntax highlighting.",
+  "license": "MIT",
+  "repository": "https://github.com/stablyai/orca-plugins/tree/main/plugins/cpp-kit",
+  "engines": {
+    "orca": ">=1.4.245"
+  },
+  "contributes": {
+    "syntaxes": [
+      {
+        "id": "cpp-inlines",
+        "title": "C++ Inlines & Templates",
+        "scopeName": "source.cpp.inlines",
+        "path": "syntaxes/cpp.tmLanguage.json",
+        "configuration": "syntaxes/cpp-configuration.json",
+        "extensions": [
+          ".ipp",
+          ".inl",
+          ".tpp",
+          ".tcc",
+          ".ixx",
+          ".cppm"
+        ],
+        "filenames": []
+      },
+      {
+        "id": "cmake",
+        "title": "CMake",
+        "scopeName": "source.cmake",
+        "path": "syntaxes/cmake.tmLanguage.json",
+        "configuration": "syntaxes/cmake-configuration.json",
+        "extensions": [
+          ".cmake"
+        ],
+        "filenames": [
+          "CMakeLists.txt",
+          "CMakeCache.txt"
+        ]
+      }
+    ]
+  },
+  "capabilities": []
+}

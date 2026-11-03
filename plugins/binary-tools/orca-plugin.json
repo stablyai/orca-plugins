@@ -1,0 +1,76 @@
+{
+  "manifestVersion": 2,
+  "id": "orca-binary-tools",
+  "publisher": "stablyai",
+  "name": "Binary & Assembly Tools",
+  "version": "1.0.3",
+  "execution": "sandboxed-ui",
+  "description": "Low-level binary inspection (ELF, AR archives, PE/COFF) with virtualized hex view, data inspector, and assembly syntax highlighting (x86/x64, ARM, GAS).",
+  "license": "MIT",
+  "repository": "https://github.com/stablyai/orca-plugins/tree/main/plugins/binary-tools",
+  "engines": {
+    "orca": ">=1.4.245"
+  },
+  "contributes": {
+    "syntaxes": [
+      {
+        "id": "asm-x86",
+        "title": "Assembly (x86 / x86_64)",
+        "scopeName": "source.asm.x86",
+        "path": "syntaxes/x86.tmLanguage.json",
+        "configuration": "syntaxes/x86-configuration.json",
+        "extensions": [
+          ".asm",
+          ".inc"
+        ],
+        "filenames": []
+      },
+      {
+        "id": "asm-arm",
+        "title": "Assembly (ARM / AArch64)",
+        "scopeName": "source.asm.arm",
+        "path": "syntaxes/arm.tmLanguage.json",
+        "configuration": "syntaxes/arm-configuration.json",
+        "extensions": [
+          ".arm",
+          ".a64"
+        ],
+        "filenames": []
+      },
+      {
+        "id": "asm-generic",
+        "title": "Assembly (GAS / AT&T)",
+        "scopeName": "source.asm",
+        "path": "syntaxes/generic.tmLanguage.json",
+        "configuration": "syntaxes/gas-configuration.json",
+        "extensions": [
+          ".s"
+        ],
+        "filenames": []
+      }
+    ],
+    "customEditors": [
+      {
+        "id": "binary-inspector",
+        "title": "Binary Inspector",
+        "extensions": [
+          ".o",
+          ".obj",
+          ".a",
+          ".lib",
+          ".so",
+          ".dylib",
+          ".dll",
+          ".exe",
+          ".bin",
+          ".elf",
+          ".out"
+        ],
+        "entry": "editor/index.html",
+        "priority": "default",
+        "contentKind": "bytes"
+      }
+    ]
+  },
+  "capabilities": []
+}

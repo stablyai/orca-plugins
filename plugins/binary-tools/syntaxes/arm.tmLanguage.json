@@ -1,0 +1,239 @@
+{
+  "scopeName": "source.asm.arm",
+  "name": "ARM Assembly",
+  "fileTypes": [],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#labels" },
+    { "include": "#strings" },
+    { "include": "#directives" },
+    { "include": "#registers-system" },
+    { "include": "#registers-simd" },
+    { "include": "#registers-aarch64" },
+    { "include": "#registers-arm32" },
+    { "include": "#shift-operations" },
+    { "include": "#instructions-branch" },
+    { "include": "#instructions-simd-neon" },
+    { "include": "#instructions-system" },
+    { "include": "#instructions-load-store" },
+    { "include": "#instructions-data-processing" },
+    { "include": "#immediates" },
+    { "include": "#numbers" },
+    { "include": "#vector-arrangement" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.asm.arm",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.line.at.asm.arm",
+          "match": "@.*$"
+        },
+        {
+          "name": "comment.block.asm.arm",
+          "begin": "/\\*",
+          "end": "\\*/"
+        },
+        {
+          "name": "comment.line.semicolon.asm.arm",
+          "match": ";.*$"
+        }
+      ]
+    },
+    "labels": {
+      "patterns": [
+        {
+          "match": "^\\s*([0-9]+)(:)",
+          "captures": {
+            "1": { "name": "entity.name.function.label.local.asm.arm" },
+            "2": { "name": "punctuation.separator.label.asm.arm" }
+          }
+        },
+        {
+          "match": "^\\s*([A-Za-z_.][A-Za-z0-9_.$]*)(:)",
+          "captures": {
+            "1": { "name": "entity.name.function.label.asm.arm" },
+            "2": { "name": "punctuation.separator.label.asm.arm" }
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.asm.arm",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.asm.arm",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.asm.arm",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.asm.arm",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "name": "keyword.directive.asm.arm",
+          "match": "(?i)\\.(text|data|bss|section|global|globl|type|size|align|p2align|balign|arm|thumb|thumb_func|syntax|arch|cpu|fpu|eabi_attribute|fnstart|fnend|save|pad|setfp|cantunwind|handlerdata|personality|word|short|byte|hword|long|quad|float|double|ascii|asciz|string|space|skip|fill|zero|comm|lcomm|set|equ|equiv|weak|hidden|extern|file|loc|ltorg|pool|req|unreq|dn|qn|inst|cfi_startproc|cfi_endproc|cfi_def_cfa|cfi_offset)\\b"
+        }
+      ]
+    },
+    "instructions-data-processing": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.data.asm.arm",
+          "match": "(?i)\\b(movw|movt|movn|movz|movk|mvns|mov|mvn|adds|adcs|add|adc|subs|sbcs|sub|sbc|rsbs|rscs|rsb|rsc|muls|mlas|mls|mul|mla|umull|umlal|smull|smlal|sdiv|udiv|madd|msub|smaddl|smsubl|umaddl|umsubl|ands|orrs|eors|bics|orns|and|orr|eor|bic|orn|mvns|tst|teq|cmn|cmp|negs|ngcs|neg|ngc|adrp|adr|clz|rbit|rev16|rev32|revsh|rev|sbfm|ubfm|sbfx|ubfx|bfm|bfi|bfxil|extr|sxtb|sxth|sxtw|uxtb|uxth)\\b"
+        }
+      ]
+    },
+    "instructions-load-store": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.memory.asm.arm",
+          "match": "(?i)\\b(ldarb|ldarh|ldar|ldaxrb|ldaxrh|ldaxr|ldxrb|ldxrh|ldxr|ldrsb|ldrsh|ldrsw|ldrexb|ldrexh|ldrexd|ldrex|ldrb|ldrh|ldr|ldpsw|ldnp|ldp|ldmib|ldmia|ldmdb|ldmda|ldm|stlrb|stlrh|stlr|stxrb|stxrh|stxr|strexb|strexh|strexd|strex|strb|strh|str|stnp|stp|stmib|stmia|stmdb|stmda|stm|push|pop|swpb|swp|prfm)\\b"
+        }
+      ]
+    },
+    "instructions-branch": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.branch.asm.arm",
+          "match": "(?i)\\b(blx|bx|bl|b)(?:eq|ne|cs|hs|cc|lo|mi|pl|vs|vc|hi|ls|ge|lt|gt|le|al)?\\b"
+        },
+        {
+          "name": "keyword.mnemonic.branch.asm.arm",
+          "match": "(?i)\\b(br|blr|ret|cbz|cbnz|tbz|tbnz|svc|swi|hvc|smc|brk|eret)\\b"
+        }
+      ]
+    },
+    "instructions-system": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.system.asm.arm",
+          "match": "(?i)\\b(mrs|msr|nop|wfe|wfi|sev|sevl|yield|isb|dsb|dmb|clrex|cpsie|cpsid|bkpt|udf|sys|sysl|dc|ic|at|tlbi|hint)\\b"
+        }
+      ]
+    },
+    "instructions-simd-neon": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.simd.asm.arm",
+          "match": "(?i)\\b(vadd|vsub|vmul|vmov|vld1|vld2|vld3|vld4|vst1|vst2|vst3|vst4|vdup|vzip|vuzp|vtrn|vcmp|vcmpe|vcvt|vabs|vneg|vmin|vmax|vand|vorr|veor|vbic|vmla|vmls|vldr|vstr|vpush|vpop|vldm|vstm|vswp|vtbl|vtbx|vqadd|vqsub|vqmul|vqdmull|vqdmlal|vqdmlsl|vhadd|vhsub|vrhadd|vrshl|vshl|vshr|vsra|vrshr|vrsra|vmvn|vorn|vceq|vcge|vcgt|vcle|vclt|vrecpe|vrsqrte|vpmax|vpmin|vpadd|vpadal|vpaddl)\\b[^:]*"
+        },
+        {
+          "name": "keyword.mnemonic.simd.asm.arm",
+          "match": "(?i)\\b(fmov|fadd|fsub|fmul|fdiv|fcmpe|fcmp|fcvtzs|fcvtzu|fcvt|scvtf|ucvtf|fabs|fneg|fsqrt|fmax|fmin|fmadd|fmsub|fnmadd|fnmsub|frintn|frintp|frintm|frintz|frinta)\\b"
+        }
+      ]
+    },
+    "condition-codes": {
+      "patterns": [
+        {
+          "name": "keyword.condition.asm.arm",
+          "match": "(?i)\\b(eq|ne|cs|hs|cc|lo|mi|pl|vs|vc|hi|ls|ge|lt|gt|le|al)\\b"
+        }
+      ]
+    },
+    "shift-operations": {
+      "patterns": [
+        {
+          "name": "keyword.operator.shift.asm.arm",
+          "match": "(?i)\\b(lsl|lsr|asr|ror|rrx)\\b"
+        }
+      ]
+    },
+    "registers-arm32": {
+      "patterns": [
+        {
+          "name": "variable.language.register.general.asm.arm",
+          "match": "(?i)\\b(r1[0-5]|r[0-9]|a[1-4]|v[1-8]|sb|sl|fp|ip|sp|lr|pc|cpsr|spsr|apsr)\\b"
+        }
+      ]
+    },
+    "registers-aarch64": {
+      "patterns": [
+        {
+          "name": "variable.language.register.general.asm.arm",
+          "match": "(?i)\\b(x30|x[12][0-9]|x[0-9]|w30|w[12][0-9]|w[0-9]|sp|wsp|xzr|wzr|lr)\\b"
+        }
+      ]
+    },
+    "registers-simd": {
+      "patterns": [
+        {
+          "name": "variable.language.register.simd.asm.arm",
+          "match": "(?i)\\b(v3[01]|v[12][0-9]|v[0-9]|b3[01]|b[12][0-9]|b[0-9]|h3[01]|h[12][0-9]|h[0-9]|s3[01]|s[12][0-9]|s[0-9]|d3[01]|d[12][0-9]|d[0-9]|q1[0-5]|q[0-9])\\b"
+        }
+      ]
+    },
+    "registers-system": {
+      "patterns": [
+        {
+          "name": "variable.language.register.system.asm.arm",
+          "match": "(?i)\\b(sctlr_el[123]|ttbr[01]_el[12]|elr_el[123]|spsr_el[123]|esr_el[123]|far_el[123]|vbar_el[123]|mair_el[123]|tcr_el[12]|daif|nzcv|fpcr|fpsr|currentel|sp_el[012]|tpidr_el[012]|tpidrro_el0|cntfrq_el0|cntvct_el0|cntp_ctl_el0)\\b"
+        }
+      ]
+    },
+    "immediates": {
+      "patterns": [
+        {
+          "name": "constant.numeric.immediate.asm.arm",
+          "match": "#-?0x[0-9a-fA-F]+"
+        },
+        {
+          "name": "constant.numeric.immediate.asm.arm",
+          "match": "#-?0b[01]+"
+        },
+        {
+          "name": "constant.numeric.immediate.asm.arm",
+          "match": "#-?[0-9]+"
+        },
+        {
+          "name": "keyword.operator.relocation.asm.arm",
+          "match": "(?i):(lo12|abs_g[0-3]|abs_g[0-3]_nc|abs_g[0-3]_s|got|got_lo12|gottprel|gottprel_lo12|tprel|tprel_lo12|tprel_hi12|tlsdesc|tlsdesc_lo12|pg_hi21|pg_hi21_nc):"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.asm.arm",
+          "match": "\\b0x[0-9a-fA-F]+\\b"
+        },
+        {
+          "name": "constant.numeric.binary.asm.arm",
+          "match": "\\b0b[01]+\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.asm.arm",
+          "match": "\\b[0-9]+\\b"
+        }
+      ]
+    },
+    "vector-arrangement": {
+      "patterns": [
+        {
+          "name": "storage.type.simd.arrangement.asm.arm",
+          "match": "(?i)\\.(16b|8b|8h|4h|4s|2s|2d|1d|1q|b|h|s|d)\\b"
+        }
+      ]
+    }
+  }
+}

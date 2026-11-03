@@ -1,0 +1,118 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "CMake",
+  "scopeName": "source.cmake",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#variables" },
+    { "include": "#generator_expressions" },
+    { "include": "#commands" },
+    { "include": "#arguments" },
+    { "include": "#constants" },
+    { "include": "#numbers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.cmake",
+          "begin": "#\\[(=*)\\[",
+          "end": "\\]\\1\\]"
+        },
+        {
+          "name": "comment.line.number-sign.cmake",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.cmake",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.cmake",
+              "match": "\\\\([\"\\\\nrt$]|.)"
+            },
+            { "include": "#variables" },
+            { "include": "#generator_expressions" }
+          ]
+        },
+        {
+          "name": "string.unquoted.bracket.cmake",
+          "begin": "\\[(=*)\\[",
+          "end": "\\]\\1\\]"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.other.readwrite.cmake",
+          "match": "\\$([A-Za-z_][A-Za-z0-9_]*)?\\{([A-Za-z0-9_\\-\\./\\+]+)\\}",
+          "captures": {
+            "1": { "name": "storage.modifier.cmake" },
+            "2": { "name": "variable.name.cmake" }
+          }
+        }
+      ]
+    },
+    "generator_expressions": {
+      "patterns": [
+        {
+          "name": "variable.language.generator-expression.cmake",
+          "begin": "\\$<",
+          "end": ">",
+          "patterns": [
+            { "include": "#variables" },
+            { "include": "#generator_expressions" },
+            { "include": "#strings" }
+          ]
+        }
+      ]
+    },
+    "commands": {
+      "patterns": [
+        {
+          "match": "(?i)\\b(if|elseif|else|endif|foreach|endforeach|while|endwhile|function|endfunction|macro|endmacro|return)\\b\\s*(?=\\()",
+          "name": "keyword.control.cmake"
+        },
+        {
+          "match": "(?i)\\b(cmake_minimum_required|project|add_executable|add_library|target_link_libraries|target_include_directories|target_compile_definitions|target_compile_options|target_compile_features|target_sources|set_target_properties|get_target_property|find_package|find_library|find_path|find_program|find_file|include|add_subdirectory|FetchContent_Declare|FetchContent_MakeAvailable|FetchContent_Populate|set|unset|list|string|option|math|message|configure_file|file|install|enable_testing|add_test|execute_process|add_custom_command|add_custom_target|add_dependencies|link_directories|include_directories|separate_arguments|aux_source_directory)\\b\\s*(?=\\()",
+          "name": "support.function.builtin.cmake"
+        },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b\\s*(?=\\()",
+          "name": "entity.name.function.cmake"
+        }
+      ]
+    },
+    "arguments": {
+      "patterns": [
+        {
+          "match": "(?i)\\b(PUBLIC|PRIVATE|INTERFACE|REQUIRED|QUIET|EXCLUDE_FROM_ALL|CONFIG|VERSION|LANGUAGES|DESCRIPTION|HOMEPAGE_URL|DESTINATION|FILES|DIRECTORY|TARGETS|PROPERTIES|ALIAS|IMPORTED|GLOBAL|MODULE|STATIC|SHARED|OBJECT|DEFINED|NOT|AND|OR|LESS|GREATER|EQUAL|LESS_EQUAL|GREATER_EQUAL|STREQUAL|STRLESS|STRGREATER|STRLESS_EQUAL|STRGREATER_EQUAL|VERSION_LESS|VERSION_GREATER|VERSION_EQUAL|VERSION_LESS_EQUAL|VERSION_GREATER_EQUAL|PATH_EQUAL|EXISTS|IS_DIRECTORY|IS_SYMLINK|IS_ABSOLUTE|IN_LIST|MATCHES)\\b",
+          "name": "keyword.other.cmake"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "match": "(?i)\\b(TRUE|FALSE|ON|OFF|YES|NO|1|0)\\b",
+          "name": "constant.language.boolean.cmake"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b[0-9]+(\\.[0-9]+)*\\b",
+          "name": "constant.numeric.cmake"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,351 @@
+{
+  "scopeName": "source.asm.x86",
+  "name": "x86 Assembly",
+  "fileTypes": [
+    "asm"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#preprocessor"
+    },
+    {
+      "include": "#labels"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#registers-att"
+    },
+    {
+      "include": "#registers-simd"
+    },
+    {
+      "include": "#registers-special"
+    },
+    {
+      "include": "#registers-segment"
+    },
+    {
+      "include": "#registers-general-64"
+    },
+    {
+      "include": "#registers-general-32"
+    },
+    {
+      "include": "#registers-general-16-8"
+    },
+    {
+      "include": "#operand-size"
+    },
+    {
+      "include": "#directives-gas"
+    },
+    {
+      "include": "#directives-nasm"
+    },
+    {
+      "include": "#data-directives"
+    },
+    {
+      "include": "#instructions-branch"
+    },
+    {
+      "include": "#instructions-system"
+    },
+    {
+      "include": "#instructions-string"
+    },
+    {
+      "include": "#instructions-set-cc"
+    },
+    {
+      "include": "#instructions-simd"
+    },
+    {
+      "include": "#instructions-arithmetic"
+    },
+    {
+      "include": "#instructions-logical"
+    },
+    {
+      "include": "#instructions-general"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.semicolon.asm.x86",
+          "match": ";.*$"
+        },
+        {
+          "name": "comment.line.hash.asm.x86",
+          "match": "#.*$"
+        },
+        {
+          "name": "comment.line.double-slash.asm.x86",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.asm.x86",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "preprocessor": {
+      "patterns": [
+        {
+          "name": "keyword.preprocessor.asm.x86",
+          "match": "(?i)%(?:macro|endmacro|define|undef|assign|defstr|strcat|strlen|substr|ifdef|ifndef|if|elif|else|endif|include|rep|endrep|rotate|error|warning|line)\\b"
+        }
+      ]
+    },
+    "labels": {
+      "patterns": [
+        {
+          "match": "^\\s*(\\.[a-zA-Z_0-9]+)(:)",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.label.local.asm.x86"
+            },
+            "2": {
+              "name": "punctuation.separator.label.asm.x86"
+            }
+          }
+        },
+        {
+          "match": "^\\s*([a-zA-Z_?$@][a-zA-Z0-9_?$@]*)(:)",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.label.asm.x86"
+            },
+            "2": {
+              "name": "punctuation.separator.label.asm.x86"
+            }
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.asm.x86",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.asm.x86",
+              "match": "\\\\(?:[abefnrtv\\\\'\"]|x[0-9a-fA-F]{2}|[0-7]{1,3})"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.asm.x86",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.asm.x86",
+              "match": "\\\\(?:[abefnrtv\\\\'\"]|x[0-9a-fA-F]{2}|[0-7]{1,3})"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.backtick.asm.x86",
+          "begin": "`",
+          "end": "`",
+          "patterns": [
+            {
+              "name": "constant.character.escape.asm.x86",
+              "match": "\\\\(?:[abefnrtv\\\\'\"]|x[0-9a-fA-F]{2}|[0-7]{1,3})"
+            }
+          ]
+        }
+      ]
+    },
+    "registers-att": {
+      "patterns": [
+        {
+          "name": "variable.language.register.att.asm.x86",
+          "match": "(?i)%[er]?[a-d][xhl]|%[er]?(?:si|di|bp|sp)|%[er]?ip|%r(?:8|9|1[0-5])[dwb]?|%[cdefgs]s|%[xyz]mm(?:[0-9]|[12][0-9]|3[01])|%cr[0-8]|%dr[0-7]|%st(?:\\([0-7]\\))?"
+        }
+      ]
+    },
+    "registers-simd": {
+      "patterns": [
+        {
+          "name": "variable.language.register.simd.asm.x86",
+          "match": "(?i)\\b(?:[xyz]mm(?:[0-9]|[12][0-9]|3[01])|mm[0-7]|k[0-7])\\b"
+        }
+      ]
+    },
+    "registers-special": {
+      "patterns": [
+        {
+          "name": "variable.language.register.special.asm.x86",
+          "match": "(?i)\\b(?:[re]?ip|[re]?flags|cr[0-8]|dr[0-7]|tr[0-7]|st[0-7]|st\\([0-7]\\)|gdtr|idtr|ldtr|msr)\\b"
+        }
+      ]
+    },
+    "registers-segment": {
+      "patterns": [
+        {
+          "name": "variable.language.register.segment.asm.x86",
+          "match": "(?i)\\b(?:cs|ds|es|fs|gs|ss)\\b"
+        }
+      ]
+    },
+    "registers-general-64": {
+      "patterns": [
+        {
+          "name": "variable.language.register.general.asm.x86",
+          "match": "(?i)\\b(?:r[a-d]x|r(?:si|di|bp|sp)|r(?:8|9|1[0-5])[dwb]?|r(?:8|9|1[0-5]))\\b"
+        }
+      ]
+    },
+    "registers-general-32": {
+      "patterns": [
+        {
+          "name": "variable.language.register.general.asm.x86",
+          "match": "(?i)\\b(?:e[a-d]x|e(?:si|di|bp|sp))\\b"
+        }
+      ]
+    },
+    "registers-general-16-8": {
+      "patterns": [
+        {
+          "name": "variable.language.register.general.asm.x86",
+          "match": "(?i)\\b(?:[a-d]x|[a-d][hl]|si|di|bp|sp|sil|dil|bpl|spl)\\b"
+        }
+      ]
+    },
+    "operand-size": {
+      "patterns": [
+        {
+          "name": "storage.type.size.asm.x86",
+          "match": "(?i)\\b(?:byte|word|dword|qword|tword|tbyte|oword|yword|zword|ptr|near|far|short|rel)\\b"
+        }
+      ]
+    },
+    "directives-gas": {
+      "patterns": [
+        {
+          "name": "keyword.directive.gas.asm.x86",
+          "match": "(?i)\\.(?:section|text|data|bss|rodata|global|globl|extern|type|size|align|p2align|balign|org|fill|space|skip|byte|short|word|int|long|quad|octa|float|double|ascii|asciz|string|comm|lcomm|set|equ|equiv|weak|hidden|protected|internal|file|loc|cfi_startproc|cfi_endproc|cfi_def_cfa|cfi_def_cfa_offset|cfi_def_cfa_register|cfi_offset|cfi_adjust_cfa_offset|cfi_register|cfi_remember_state|cfi_restore_state|cfi_restore|intel_syntax|att_syntax)\\b"
+        }
+      ]
+    },
+    "directives-nasm": {
+      "patterns": [
+        {
+          "name": "keyword.directive.nasm.asm.x86",
+          "match": "(?i)\\b(?:section|segment|global|globl|extern|default|bits|use16|use32|use64|org|align|alignb|struc|endstruc|istruc|at|iend|times|incbin|absolute|common|cpu)\\b"
+        }
+      ]
+    },
+    "data-directives": {
+      "patterns": [
+        {
+          "name": "storage.type.data.asm.x86",
+          "match": "(?i)\\b(?:db|dw|dd|dq|dt|do|dy|dz|resb|resw|resd|resq|rest|reso|resy|resz|equ)\\b"
+        }
+      ]
+    },
+    "instructions-branch": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.branch.asm.x86",
+          "match": "(?i)\\b(?:jmp|call|ret|retn|retf|enter|leave|loop|loope|loopne|loopz|loopnz|j[er]?cxz|j[a-z]{1,4})\\b"
+        }
+      ]
+    },
+    "instructions-system": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.system.asm.x86",
+          "match": "(?i)\\b(?:syscall|sysenter|sysexit|sysret|cli|sti|clc|stc|cmc|cld|std|clflush|cpuid|rdtsc|rdtscp|rdmsr|wrmsr|lgdt|sgdt|lidt|sidt|lldt|sldt|ltr|str|hlt|invd|wbinvd|invlpg|lfence|sfence|mfence|pause|ud2|xgetbv|xsetbv|int[0-9]*|into|iret|iretd|iretq)\\b"
+        }
+      ]
+    },
+    "instructions-string": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.string.asm.x86",
+          "match": "(?i)\\b(?:rep|repe|repz|repne|repnz|movs[bdqw]|stos[bdqw]|lods[bdqw]|cmps[bdqw]|scas[bdqw]|ins[bdw]|outs[bdw])\\b"
+        }
+      ]
+    },
+    "instructions-set-cc": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.setcc.asm.x86",
+          "match": "(?i)\\bset(?:[a-z]{1,3})\\b"
+        }
+      ]
+    },
+    "instructions-simd": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.simd.asm.x86",
+          "match": "(?i)\\bv?(?:mov[au]p[sd]|movdq[au]|addp[sd]|subp[sd]|mulp[sd]|divp[sd]|sqrtp[sd]|maxp[sd]|minp[sd]|cmpp[sd]|shufp[sd]|unpck[hl]p[sd]|cvts[is]2s[sd]|p(?:xor|or|and|andn|add[bdqw]|sub[bdqw]|mullw|mulhw|cmpeq[bdqw]|cmpgt[bdqw]|sll[wdq]|srl[wdq]|sra[wd]|unpckl(?:bw|wd|dq|qdq)|packuswb|packsswb|alignr))\\b"
+        }
+      ]
+    },
+    "instructions-arithmetic": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.arithmetic.asm.x86",
+          "match": "(?i)\\b(?:add|sub|adc|sbb|mul|imul|div|idiv|inc|dec|neg|aaa|aad|aam|aas|daa|das)\\b"
+        }
+      ]
+    },
+    "instructions-logical": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.logical.asm.x86",
+          "match": "(?i)\\b(?:and|or|xor|not|shl|shr|sar|sal|rol|ror|rcl|rcr|shld|shrd|bt|bts|btr|btc|bsf|bsr|test|cmp)\\b"
+        }
+      ]
+    },
+    "instructions-general": {
+      "patterns": [
+        {
+          "name": "keyword.mnemonic.general.asm.x86",
+          "match": "(?i)\\b(?:mov[sz]x?|movsxd|cmov[a-z]{1,3}|push[adfq]?|pop[adfq]?|lea|xchg|bswap|cmpxchg(?:8b|16b)?|nop|cdq|cqo|cbw|cwde|cdqe|cwd)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.immediate.att.asm.x86",
+          "match": "\\$(?:0x[0-9a-fA-F]+|-?[0-9]+)"
+        },
+        {
+          "name": "constant.numeric.hex.asm.x86",
+          "match": "(?i)\\b(?:0x[0-9a-fA-F]+|[0-9][0-9a-fA-F]*h)\\b"
+        },
+        {
+          "name": "constant.numeric.binary.asm.x86",
+          "match": "(?i)\\b(?:0b[01]+|[01]+b)\\b"
+        },
+        {
+          "name": "constant.numeric.octal.asm.x86",
+          "match": "(?i)\\b(?:0o[0-7]+|[0-7]+[oq])\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.asm.x86",
+          "match": "\\b[0-9]+\\b"
+        }
+      ]
+    }
+  }
+}
