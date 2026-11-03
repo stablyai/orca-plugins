@@ -6,17 +6,20 @@
 // one shape, not the scene. Both repaint at most once per animation frame. Zoomed far out, a
 // large image draws from a downscaled copy.
 //
-// The file is only written through Orca: edits are debounced, encoded off the main thread, and
-// sent as the whole new file (see container.js for the format); Orca saves them on ⌘S.
-import { SAVABLE_FORMATS, detectFormat, imageSize, readMarkup, sameBytes, writeMarkup } from './container.js'
+// The file is only written through Orca's document session: edits are debounced, encoded off the
+// main thread, and handed over as the whole new file (see container.js for the format); Orca
+// keeps it dirty, saves it on ⌘S, and merges writes from outside (see document-sync.js).
+import { SAVABLE_FORMATS, imageSize, withPngDensity, writeMarkup } from './container.js'
+import { mergeImages, openImageSession, sameFile } from './document-sync.js'
 import {
   TEXT_LINE_HEIGHT,
   dragHandle,
   isBoxLike,
+  isStroke,
   moveShape,
   normalizeBox,
   MAX_TEXT,
-  parseScene,
+  renumberSteps,
   sceneFits,
   serializeScene,
   shapeAt,
@@ -53,10 +56,13 @@ const MOD = IS_MAC ? '⌘' : 'Ctrl+'
 const TOOLS = [
   { id: 'select', label: 'Select', key: 'v' },
   { id: 'pen', label: 'Pen', key: 'p' },
+  { id: 'marker', label: 'Highlighter', key: 'h' },
   { id: 'arrow', label: 'Arrow', key: 'a' },
   { id: 'box', label: 'Box', key: 'r' },
   { id: 'ellipse', label: 'Ellipse', key: 'o' },
-  { id: 'text', label: 'Text', key: 't' }
+  { id: 'text', label: 'Text', key: 't' },
+  { id: 'step', label: 'Step number', key: 'n' },
+  { id: 'redact', label: 'Redact', key: 'x' }
 ]
 const COLORS = [
   ['#ff3b30', 'Red'],
@@ -85,13 +91,12 @@ const overlayContext = overlayCanvas.getContext('2d')
 
 const s = {
   // Document
-  version: null,
   readOnly: true,
   format: null,
   savable: false,
   original: null, // the image's own bytes: the file, or the original kept inside saved markup
   hadMarkup: false,
-  lastPosted: null, // bytes Orca holds for `posted`
+  base: null, // the session value the scene was last loaded from or handed over as
   // Image
   bitmap: null,
   mips: [],
@@ -100,7 +105,7 @@ const s = {
   // Scene
   shapes: [],
   loaded: [], // the scene as the document opened
-  posted: [], // the scene Orca last accepted
+  posted: [], // the scene last handed to the session
   past: [],
   future: [],
   selectedId: null,
@@ -123,10 +128,8 @@ const s = {
   // Saving
   timer: undefined,
   committing: null,
-  inFlight: null, // recognize an edit echoed by Orca before applyEdit resolves
   urgent: false, // Orca is waiting on a flush: encode without yielding
   lastGesture: 0, // last wheel zoom or pan, so encoding can wait for the gesture to end
-  awaitingDocument: false, // Orca refused an edit as stale; send again once its newer document arrives
   saveError: null,
   flatCache: null
 }
@@ -138,9 +141,9 @@ const selected = () => (s.selectedId === null ? null : (s.shapes.find((shape) =>
 const unit = () => Math.max(2, Math.min(s.width, s.height) / 250)
 const strokeFor = (width) => Math.max(1.5, unit() * WIDTHS.find(([id]) => id === width)[2])
 const fontSizeFor = (width) => Math.max(14, unit() * WIDTHS.find(([id]) => id === width)[3])
+const markerFor = (width) => strokeFor(width) * 6
+const stepSizeFor = (width) => fontSizeFor(width) * 1.7
 const tolerance = () => HIT_SLOP / s.view.scale
-const exactBuffer = (bytes) =>
-  bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ? bytes.buffer : bytes.slice().buffer
 
 const bounds = new WeakMap()
 function boundsOf(shape) {
@@ -259,7 +262,7 @@ function paintBase() {
     if (shape === hidden) continue
     const [x0, y0, x1, y1] = boundsOf(shape)
     if (x1 < vx0 || y1 < vy0 || x0 > vx1 || y0 > vy1) continue
-    drawShape(ctx, shape)
+    drawShape(ctx, shape, s.bitmap)
   }
 }
 
@@ -305,7 +308,7 @@ function compositeLayer(k, hidden, width, height) {
   }
   layer.context.setTransform(k, 0, 0, k, 0, 0)
   for (let i = appended ? layer.shapes.length : 0; i < s.shapes.length; i++) {
-    if (s.shapes[i] !== hidden) drawShape(layer.context, s.shapes[i])
+    if (s.shapes[i] !== hidden) drawShape(layer.context, s.shapes[i], s.bitmap)
   }
   Object.assign(layer, { k, bitmap: s.bitmap, shapes: s.shapes, hidden })
   return layer
@@ -340,7 +343,7 @@ function paintOverlay() {
   const preview = s.op?.preview ?? null
   if (preview) {
     imageTransform(ctx)
-    drawShape(ctx, preview)
+    drawShape(ctx, preview, s.bitmap)
   }
   const shape = !s.op || s.op.kind === 'pan' ? selected() : s.op.kind === 'draw' ? null : preview
   if (shape) paintSelection(ctx, shape)
@@ -395,6 +398,7 @@ function readStageColor() {
 // ---- scene changes and history ----
 
 function setShapes(next) {
+  next = renumberSteps(next)
   // Only what reopens intact may be kept; see sceneLimits.
   if (!sceneFits(next, s.width, s.height, new Set(s.shapes))) {
     toast('This image already holds as much markup as it can keep (5,000 shapes, 200,000 pen points, 20,000 characters).', 5000)
@@ -449,7 +453,11 @@ function select(shape) {
 
 // ---- saving through Orca ----
 
-const canSave = () => s.bitmap !== null && s.savable && !s.readOnly && s.version !== null
+// Orca's document session (document-sync.js): it holds the buffer, marks the tab dirty, saves on
+// ⌘S and resolves conflicts with outside writes. This editor encodes each scene and hands it over.
+let doc = null
+
+const canSave = () => s.bitmap !== null && s.savable && !s.readOnly && doc !== null
 
 function scheduleCommit() {
   if (!canSave()) return
@@ -458,7 +466,7 @@ function scheduleCommit() {
   updateStatus()
 }
 
-/** Sends the latest scene to Orca; resolves once Orca holds it. Orca awaits this before saving. */
+/** Encodes the latest scene and hands it to the session; resolves once the session has it. */
 function commit() {
   window.clearTimeout(s.timer)
   s.timer = undefined
@@ -472,48 +480,28 @@ function commit() {
 }
 
 async function commitLoop() {
-  while (canSave() && s.shapes !== s.posted && !s.awaitingDocument) {
-    // The bytes depend on the scene and the image only, so a version that moves on while they
-    // encode (Orca resending the same file) doesn't make them stale; a new image does.
+  while (canSave() && s.shapes !== s.posted) {
     const { shapes, bitmap } = s
-    let bytes
+    let value
     try {
-      bytes = await encodeDocument(shapes)
+      value = await encodeValue(shapes)
     } catch (error) {
       s.saveError = `Couldn't encode the markup: ${error?.message ?? error}`
       return
     }
-    if (bitmap !== s.bitmap) return
-    if (bytes.byteLength > MAX_DOCUMENT_BYTES) {
+    if (bitmap !== s.bitmap || !canSave()) return
+    if (value.file.byteLength > MAX_DOCUMENT_BYTES) {
       s.saveError = "The image with markup is over Orca's 64 MiB limit, too large to save."
       return
     }
-    const version = s.version
-    const inFlight = { bitmap, bytes }
-    s.inFlight = inFlight
-    try {
-      await window.orca.document.applyEdit({ baseVersion: version, content: { kind: 'bytes', bytes: exactBuffer(bytes) } })
-    } catch (error) {
-      if (bitmap !== s.bitmap) return
-      if (error?.code !== 'conflict') {
-        s.saveError = `Orca didn't take the markup: ${error?.message ?? error}`
-        return
-      }
-      // Orca holds a newer document than the one this edit named. If it has already arrived as
-      // the same file, send again against it; otherwise send once it arrives (onDocument).
-      if (s.version === version) s.awaitingDocument = true
-      continue
-    } finally {
-      if (s.inFlight === inFlight) s.inFlight = null
-    }
-    if (bitmap !== s.bitmap) return
+    doc.change(value)
     s.posted = shapes
-    s.lastPosted = bytes
+    s.base = value
     s.saveError = null
   }
 }
 
-/** Orca awaits this before it saves; rejecting stops a save that would miss the latest markup. */
+/** Orca awaits this, with the session's own flush, before it saves. */
 async function flush() {
   if (s.editing) commitTextEdit()
   s.urgent = true
@@ -523,19 +511,40 @@ async function flush() {
     s.urgent = false
   }
   if (canSave() && s.shapes !== s.posted) {
-    throw new Error(s.saveError ?? "The latest markup hasn't reached Orca yet; save again in a moment.")
+    throw new Error(s.saveError ?? "The latest markup isn't ready yet; save again in a moment.")
+  }
+  try {
+    await doc?.flush()
+  } catch (error) {
+    s.saveError = `Orca didn't take the markup: ${error?.message ?? error}`
+    updateStatus()
+    throw new Error(s.saveError)
   }
 }
 
-/** The whole file for `shapes`: the original when there is no markup, else flattened plus markup. */
-async function encodeDocument(shapes) {
-  if (shapes.length === 0) return s.original
+/**
+ * The session value for `shapes`: the original when there is no markup, else the flattened image
+ * with the markup and the original inside. Redactions are burned into that original too, so the
+ * saved file never holds the pixels under them; with nothing else to keep, it is just that image.
+ */
+async function encodeValue(shapes) {
+  const value = { format: s.format, original: s.original, shapes, hadMarkup: s.hadMarkup }
+  if (shapes.length === 0) return { ...value, file: s.original }
   const type = s.format === 'jpeg' ? 'image/jpeg' : 'image/png'
+  const redactions = shapes.filter((shape) => shape.t === 'redact')
+  const scene = redactions.length ? shapes.filter((shape) => shape.t !== 'redact') : shapes
   const flattened = new Uint8Array(await (await flattenedBlob(shapes, type)).arrayBuffer())
-  return writeMarkup(s.format, flattened, s.original, serializeScene(shapes, s.width, s.height))
+  if (redactions.length === 0) {
+    return { ...value, file: writeMarkup(s.format, flattened, s.original, serializeScene(scene, s.width, s.height)) }
+  }
+  const redacted = withDensity(new Uint8Array(await (await flattenedBlob(redactions, type)).arrayBuffer()))
+  if (scene.length === 0) return { ...value, file: redacted }
+  return { ...value, file: writeMarkup(s.format, flattened, redacted, serializeScene(scene, s.width, s.height)) }
 }
 
-/** A full-resolution render of `shapes`; the latest is kept, so Copy after a save reuses it. */
+const withDensity = (bytes) => (s.format === 'png' ? withPngDensity(bytes, s.original) : bytes)
+
+/** A full-resolution render of `shapes`; the latest is kept, so Copy and Export after a save reuse it. */
 function flattenedBlob(shapes, type = 'image/png') {
   const cache = s.flatCache
   if (cache && cache.shapes === shapes && cache.bitmap === s.bitmap && cache.type === type) return cache.blob
@@ -543,31 +552,48 @@ function flattenedBlob(shapes, type = 'image/png') {
     urgent: () => s.urgent,
     busy: () => s.op !== null || performance.now() - s.lastGesture < 300
   })
-  s.flatCache = { shapes, bitmap: s.bitmap, type, blob }
-  blob.catch(() => {
-    if (s.flatCache?.blob === blob) s.flatCache = null
-  })
+  // Redaction-only renders are a step of a save; keeping them would evict the full one.
+  if (!shapes.every((shape) => shape.t === 'redact') || shapes === s.shapes) {
+    s.flatCache = { shapes, bitmap: s.bitmap, type, blob }
+    blob.catch(() => {
+      if (s.flatCache?.blob === blob) s.flatCache = null
+    })
+  }
   return blob
 }
 
-// ---- copy ----
+// ---- copy and export ----
 
 /**
- * Whether this frame may put an image on the clipboard. Orca's editor frames don't allow
- * clipboard-write yet; asking anyway only logs a permissions-policy violation. Copy offers no
- * stand-in (an HTML data URL pastes nowhere an agent can read), so until then it points to ⌘S.
+ * Whether this frame may put an image on the clipboard. Orca's editor frames refuse the async
+ * Clipboard API; asking anyway only logs a violation. Copy offers no stand-in (an HTML data URL
+ * pastes nowhere an agent can read), so until Orca allows it, it points to ⌘S and Export.
  */
-const canCopyImage = (() => {
+let canCopyImage = (() => {
   const policy = document.permissionsPolicy ?? document.featurePolicy
   const allowed = !policy || policy.allowsFeature('clipboard-write')
   return allowed && typeof navigator.clipboard?.write === 'function' && typeof ClipboardItem === 'function'
 })()
-const COPY_UNAVAILABLE = `This version of Orca doesn't let plugins copy images yet. ${SAVE_KEY} saves the markup into the image instead.`
+// Desktop frames allow the feature but deny the permission itself.
+if (canCopyImage) {
+  navigator.permissions?.query({ name: 'clipboard-write' }).then(
+    ({ state }) => {
+      canCopyImage = state !== 'denied'
+      updateControls()
+    },
+    () => {}
+  )
+}
+/** Orca's save dialog: desktop only, and only from a click or key press in the frame. */
+const canExport = () => typeof window.orca?.files?.saveAs === 'function'
+const copyUnavailable = () =>
+  `Orca doesn't let plugins copy images yet. ${SAVE_KEY} saves the markup into the image` +
+  (canExport() ? '; Export saves a copy as a new PNG.' : ' instead.')
 
 async function copyImage() {
   if (!s.bitmap) return
   if (!canCopyImage) {
-    toast(COPY_UNAVAILABLE, 5000)
+    toast(copyUnavailable(), 5000)
     return
   }
   if (s.editing) commitTextEdit()
@@ -577,6 +603,33 @@ async function copyImage() {
     toast('Copied the image with its markup')
   } catch (error) {
     toast(`Couldn't copy the image: ${error?.message ?? error}`, 5000)
+  }
+}
+
+async function exportImage() {
+  if (!s.bitmap || !canExport()) return
+  if (s.editing) commitTextEdit()
+  let data
+  try {
+    s.urgent = true
+    data = await (await flattenedBlob(s.shapes)).arrayBuffer()
+  } catch (error) {
+    toast(`Couldn't render the image: ${error?.message ?? error}`, 5000)
+    return
+  } finally {
+    s.urgent = false
+  }
+  try {
+    const { status } = await window.orca.files.saveAs({ suggestedName: 'markup.png', mimeType: 'image/png', data })
+    if (status === 'saved') toast('Saved a copy with the markup')
+  } catch (error) {
+    // A large image can outlast the click; the render is kept, so a second click is immediate.
+    toast(
+      error?.code === 'not_permitted'
+        ? 'The image is ready. Click Export again to choose where to save it.'
+        : `Couldn't save the copy: ${error?.message ?? error}`,
+      5000
+    )
   }
 }
 
@@ -603,13 +656,14 @@ async function decode(bytes, { requireSize = false } = {}) {
 }
 
 /** Drops the image so nothing can be edited or sent while a document can't be shown. */
-function unloadImage(message, version) {
+function unloadImage(message) {
   s.bitmap?.close()
   for (const mip of s.mips) if (mip instanceof ImageBitmap) mip.close()
   if (s.editing) cancelTextEdit()
+  window.clearTimeout(s.timer)
   Object.assign(s, {
-    version,
     bitmap: null,
+    base: null,
     mips: [],
     shapes: [],
     loaded: [],
@@ -618,8 +672,6 @@ function unloadImage(message, version) {
     future: [],
     selectedId: null,
     op: null,
-    lastPosted: null,
-    awaitingDocument: false,
     flatCache: null
   })
   composite.canvas = null
@@ -631,93 +683,76 @@ function unloadImage(message, version) {
   updateControls()
 }
 
-async function onDocument(doc) {
-  if (!doc || !Number.isSafeInteger(doc.version) || doc.content?.kind !== 'bytes') return
-  if (!(doc.content.bytes instanceof ArrayBuffer)) return
-  if (s.version !== null && doc.version <= s.version) return
-  const bytes = new Uint8Array(doc.content.bytes)
-  const readOnly = doc.readOnly === true
-  // Orca hands back what this frame sent (after a save, or when the tab remounts the editor);
-  // keep the live session, with its undo history and selection. The echo can arrive before
-  // applyEdit resolves, while lastPosted still holds the preceding scene's bytes.
-  const ownEdit = s.inFlight?.bitmap === s.bitmap && sameBytes(bytes, s.inFlight.bytes)
-  if (s.bitmap && ((s.lastPosted && sameBytes(bytes, s.lastPosted)) || ownEdit)) {
-    // An image still decoding for an earlier document must not replace this newer one.
-    loadToken++
-    s.version = doc.version
-    s.readOnly = readOnly
-    s.lastPosted = bytes
-    if (s.awaitingDocument) {
-      s.awaitingDocument = false
-      if (s.shapes !== s.posted) commit()
-    }
-    updateStatus()
-    return
-  }
+/**
+ * Shows a session value: the document as it opened, an outside change, or a merge. `merged` is a
+ * value the session built from this editor's markup and an outside file; it still needs encoding.
+ */
+async function load(value, { outside = false } = {}) {
   const token = ++loadToken
-  // Unsent strokes were made on the old file; the new one wins, as for any outside change.
+  // This editor's own file (a conflict settled with it, or a change reverted): the scene shows it,
+  // and a decode still running for a newer document must not replace it.
+  if (outside && s.base && sameFile(value, s.base)) return
   window.clearTimeout(s.timer)
   s.timer = undefined
-  const format = detectFormat(bytes)
-  let markup = null
-  try {
-    markup = SAVABLE_FORMATS.has(format) ? readMarkup(bytes, format) : null
-  } catch {
-    // Malformed markup data: open the file as a plain image.
+  // Strokes the session hasn't been handed yet: merge them like the session merges its draft.
+  if (outside && s.bitmap && s.shapes !== s.posted && s.base) {
+    value = mergeImages(s.base, value, { ...s.base, shapes: s.shapes })
   }
+  const { format } = value
   let bitmap = null
-  let original = bytes
-  let shapes = []
+  let original = value.original
+  let shapes = value.shapes
   try {
-    if (markup) {
+    if (value.original !== value.file) {
       // Only this plugin ever decodes the original inside, so its header must vouch for its size.
-      bitmap = await decode(markup.original, { requireSize: true }).catch(() => null)
-      shapes = bitmap ? parseScene(markup.scene, bitmap.width, bitmap.height) : null
-      if (shapes) original = markup.original.slice()
-      else {
-        bitmap?.close()
+      bitmap = await decode(value.original, { requireSize: true }).catch(() => null)
+      const size = imageSize(value.original)
+      if (bitmap && (!size || bitmap.width !== size[0] || bitmap.height !== size[1])) {
+        bitmap.close()
         bitmap = null
+      }
+      if (!bitmap) {
+        original = value.file
         shapes = []
       }
     }
-    bitmap ??= await decode(bytes)
+    bitmap ??= await decode(value.file)
   } catch (error) {
     if (token !== loadToken) return
     unloadImage(
       error?.megapixels
         ? `This image is too large to mark up (${error.megapixels} megapixels; the limit is ${MAX_IMAGE_PIXELS / 1e6}). Switch to Orca's viewer in the view toggle.`
-        : `Can't display this file as an image${format ? '' : ': the format is not recognized'}.`,
-      doc.version
+        : `Can't display this file as an image${format ? '' : ': the format is not recognized'}.`
     )
     return
   }
   if (token !== loadToken) return bitmap.close()
 
   const sameSize = s.bitmap && s.width === bitmap.width && s.height === bitmap.height
+  const keptMarkup = value.stale === true
   s.bitmap?.close()
   for (const mip of s.mips) if (mip instanceof ImageBitmap) mip.close()
+  const base = keptMarkup ? { ...value, shapes: [] } : value
   Object.assign(s, {
-    version: doc.version,
-    readOnly,
     format,
     // Past the canvas limit the flattened image would come out blank, so such files are never written.
     savable: SAVABLE_FORMATS.has(format) && bitmap.width <= MAX_CANVAS_SIDE && bitmap.height <= MAX_CANVAS_SIDE,
     original,
-    hadMarkup: shapes.length > 0,
-    lastPosted: bytes,
+    hadMarkup: value.hadMarkup && shapes.length > 0,
     bitmap,
     mips: [],
     width: bitmap.width,
     height: bitmap.height,
     shapes,
-    loaded: shapes,
-    posted: shapes,
+    loaded: keptMarkup ? [] : shapes,
+    // A merge still has to be encoded and sent, so it doesn't count as posted.
+    posted: keptMarkup ? null : shapes,
+    base,
     past: [],
     future: [],
     selectedId: null,
     op: null,
     saveError: null,
-    awaitingDocument: false,
     flatCache: null
   })
   if (s.editing) cancelTextEdit()
@@ -729,6 +764,10 @@ async function onDocument(doc) {
   requestRender()
   updateControls()
   updateZoomLabel()
+  if (keptMarkup) {
+    toast('The image changed outside this editor. Your markup is kept on top of the new version.', 6000)
+    scheduleCommit()
+  }
 }
 
 // ---- pointer interaction ----
@@ -774,16 +813,23 @@ function onPointerDown(event) {
     startTextEdit(hit?.t === 'text' ? hit : null, x, y)
     event.preventDefault()
     return
+  } else if (s.tool === 'step') {
+    select(null)
+    setShapes([...s.shapes, withId({ t: 'step', c: s.color, z: stepSizeFor(s.stroke), x, y, n: 0 })])
+    return
   } else {
     select(null)
-    const base = { t: s.tool, c: s.color, s: strokeFor(s.stroke) }
+    const base =
+      s.tool === 'redact'
+        ? { t: 'redact' }
+        : { t: s.tool, c: s.color, s: s.tool === 'marker' ? markerFor(s.stroke) : strokeFor(s.stroke) }
     s.op = {
       kind: 'draw',
       pointerId: event.pointerId,
       base,
       start: [x, y],
       points: [x, y],
-      preview: s.tool === 'pen' ? null : { ...base, p: [x, y, x, y] }
+      preview: s.tool === 'pen' ? null : s.tool === 'marker' ? { ...base, p: [x, y] } : { ...base, p: [x, y, x, y] }
     }
   }
   overlayCanvas.setPointerCapture(event.pointerId)
@@ -822,23 +868,31 @@ function onPointerMove(event) {
   } else if (op.kind === 'handle') {
     op.preview = dragHandle(op.shape, op.handle, x, y, event.shiftKey)
   } else if (op.base.t === 'pen') {
-    // Coalesced events carry every sample the pointer made since the last frame: smoother ink.
-    const samples = event.getCoalescedEvents?.() ?? []
-    const minStep = 0.35 / s.view.scale
-    const points = op.points
-    const rect = stage.getBoundingClientRect()
-    for (const sample of samples.length ? samples : [event]) {
-      const [px, py] = toImage(s.view, sample.clientX - rect.left, sample.clientY - rect.top)
-      const lx = points[points.length - 2]
-      const ly = points[points.length - 1]
-      if (Math.abs(px - lx) + Math.abs(py - ly) >= minStep) points.push(px, py)
-    }
+    addSamples(op.points, event)
+  } else if (op.base.t === 'marker') {
+    // Shift draws a straight highlight from where the stroke started, for a line of text.
+    if (event.shiftKey) op.points = [op.start[0], op.start[1], x, y]
+    else addSamples(op.points, event)
+    op.preview = { ...op.base, p: op.points }
   } else {
     const [ox, oy] = op.start
     const end = event.shiftKey ? (op.base.t === 'arrow' ? snapAngle(ox, oy, x, y) : snapSquare(ox, oy, x, y)) : [x, y]
     op.preview = { ...op.base, p: [ox, oy, ...end] }
   }
   requestRender(false)
+}
+
+/** Appends the pointer's samples since the last event; coalesced events make smoother ink. */
+function addSamples(points, event) {
+  const samples = event.getCoalescedEvents?.() ?? []
+  const minStep = 0.35 / s.view.scale
+  const rect = stage.getBoundingClientRect()
+  for (const sample of samples.length ? samples : [event]) {
+    const [px, py] = toImage(s.view, sample.clientX - rect.left, sample.clientY - rect.top)
+    const lx = points[points.length - 2]
+    const ly = points[points.length - 1]
+    if (Math.abs(px - lx) + Math.abs(py - ly) >= minStep) points.push(px, py)
+  }
 }
 
 function onPointerUp(event) {
@@ -869,7 +923,7 @@ function onPointerUp(event) {
 
 function finishDrawing(op) {
   const minimum = 3 / s.view.scale
-  if (op.base.t === 'pen') {
+  if (isStroke(op.base)) {
     return { ...op.base, p: simplifyPoints(op.points, 0.4 / s.view.scale) }
   }
   const p = op.preview.p
@@ -1028,7 +1082,7 @@ function setColor(color) {
     placeTextEditor()
   }
   const shape = selected()
-  if (shape && shape.c !== color) replaceShape(shape, { ...shape, c: color })
+  if (shape && shape.t !== 'redact' && shape.c !== color) replaceShape(shape, { ...shape, c: color })
   updateControls()
 }
 
@@ -1040,8 +1094,13 @@ function setWidth(width) {
     placeTextEditor()
   }
   const shape = selected()
-  if (shape) {
-    const next = shape.t === 'text' ? { ...shape, z: fontSizeFor(width) } : { ...shape, s: strokeFor(width) }
+  if (shape && shape.t !== 'redact') {
+    const next =
+      shape.t === 'text'
+        ? { ...shape, z: fontSizeFor(width) }
+        : shape.t === 'step'
+          ? { ...shape, z: stepSizeFor(width) }
+          : { ...shape, s: shape.t === 'marker' ? markerFor(width) : strokeFor(width) }
     if (next.z !== shape.z || next.s !== shape.s) replaceShape(shape, next)
   }
   updateControls()
@@ -1158,14 +1217,19 @@ function buildToolbar() {
   controls.saveHint.title = `${SAVE_KEY} saves the markup into this image, so agents and other apps see it`
   $('actions').append(
     controls.saveHint,
-    (controls.copy = button(
-      'primary',
-      'Copy image with markup',
-      `${ICONS.copy}<span>Copy</span>`,
-      copyImage,
-      canCopyImage ? `Copy image with markup (${MOD}C)` : COPY_UNAVAILABLE
-    ))
+    (controls.copy = button('action', 'Copy image with markup', `${ICONS.copy}<span>Copy</span>`, copyImage))
   )
+  if (canExport()) {
+    $('actions').append(
+      (controls.export = button(
+        'action',
+        'Export a copy as PNG',
+        `${ICONS.export}<span>Export</span>`,
+        exportImage,
+        'Save a copy of the image with its markup as a new PNG file'
+      ))
+    )
+  }
 }
 
 function updateControls() {
@@ -1178,9 +1242,19 @@ function updateControls() {
   controls.redo.disabled = !s.future.length
   controls.delete.disabled = !shape
   controls.clear.disabled = !s.shapes.length
-  controls.copy.disabled = !s.bitmap
+  // Copy where it works or there is nothing better; Export where Orca offers its save dialog.
+  const copy = controls.copy
+  copy.hidden = !canCopyImage && canExport()
+  copy.classList.toggle('primary', canCopyImage || !canExport())
+  copy.disabled = !s.bitmap
+  copy.title = canCopyImage ? `Copy image with markup (${MOD}C)` : copyUnavailable()
   // Why not disabled: a disabled button shows no tooltip and ignores clicks, so the reason stays hidden.
-  if (!canCopyImage) controls.copy.setAttribute('aria-disabled', 'true')
+  if (canCopyImage) copy.removeAttribute('aria-disabled')
+  else copy.setAttribute('aria-disabled', 'true')
+  if (controls.export) {
+    controls.export.disabled = !s.bitmap
+    controls.export.classList.toggle('primary', !canCopyImage)
+  }
   updateStatus()
 }
 
@@ -1200,17 +1274,21 @@ function updateStatus() {
   if (s.saveError) {
     status = s.saveError
     tone = 'error'
-  } else if (s.readOnly) status = canCopyImage ? 'Read-only file · Copy to share your markup' : 'Read-only file · markup is not saved'
-  else if (!s.savable) {
+  } else if (s.readOnly) {
+    status = canCopyImage ? 'Read-only file · Copy to share your markup' : canExport() ? 'Read-only file · Export to keep your markup' : 'Read-only file · markup is not saved'
+  } else if (!s.savable) {
     status = SAVABLE_FORMATS.has(s.format)
       ? `Images over ${MAX_CANVAS_SIDE.toLocaleString('en-US')} px on a side can't keep markup`
       : `${FORMAT_NAMES[s.format] ?? 'This'} files can't keep markup`
     if (canCopyImage) status += ' · use Copy'
+    else if (canExport()) status += ' · use Export'
   }
   else if (s.shapes !== s.loaded) {
-    status = marks
-      ? `${SAVE_KEY} saves the markup into this image · the original stays inside, still editable`
-      : `${SAVE_KEY} restores the original image`
+    status = !marks
+      ? `${SAVE_KEY} restores the original image`
+      : s.shapes.some((shape) => shape.t === 'redact')
+        ? `${SAVE_KEY} saves the markup · redacted areas are removed from the file for good`
+        : `${SAVE_KEY} saves the markup into this image · the original stays inside, still editable`
   } else if (s.hadMarkup) status = 'Opened with markup · clear it and save to restore the original'
   // Orca doesn't tell editors when it saves, so this is an instruction, not a dirty marker.
   controls.saveHint.hidden = !s.savable || s.readOnly || !s.shapes.length
@@ -1280,9 +1358,21 @@ resizeCanvases()
 setTool('pen')
 stage.focus({ preventScroll: true })
 
-window.orca.document.onDidChange((doc) => {
-  onDocument(doc)
-})
-// Orca waits for the returned promise before it saves.
+// Orca waits for every flush handler, the session's own included, before it saves.
 window.orca.on('editor.flush', flush)
 window.orca.on('theme', readStageColor)
+if (typeof window.orca.document?.session === 'function') {
+  openImageSession().then(
+    (session) => {
+      doc = session
+      s.readOnly = session.readOnly
+      session.onReplace((value) => load(value, { outside: true }))
+      window.orca.document.onDidChange((next) => {
+        s.readOnly = next.readOnly === true
+        updateStatus()
+      })
+      load(session.value)
+    },
+    (error) => showMessage(`Can't open this file: ${error?.message ?? error}`)
+  )
+} else showMessage('Image Markup 2 needs a newer Orca. Update Orca, or switch to its viewer in the view toggle.')

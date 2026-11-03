@@ -5,6 +5,7 @@ import {
   hitShape,
   moveShape,
   parseScene,
+  renumberSteps,
   sceneFits,
   serializeScene,
   shapeAt,
@@ -137,4 +138,29 @@ test('the editor and the loader agree on limits, so saved markup reopens intact'
   assert.equal(parseScene(serializeScene(tiny, 16, 16), 16, 16).length, 2)
   // Crafted strokes far thicker than any tool makes are refused.
   assert.equal(parseScene({ v: 1, w: 1000, h: 1000, shapes: [{ t: 'pen', c: '#ff0000', s: 1000, p: [0, 0, 1, 1] }] }, 1000, 1000).length, 0)
+})
+
+test('highlighter, step and redaction shapes round-trip, hit-test and move', () => {
+  const measure = () => ({ width: 0, height: 0 })
+  const marker = withId({ t: 'marker', c: '#ffcc00', s: 24, p: [10, 10, 100, 10] })
+  const step = withId({ t: 'step', c: '#ff3b30', z: 30, x: 200, y: 200, n: 1 })
+  const redact = withId({ t: 'redact', p: [300, 300, 400, 350] })
+  assert.ok(hitShape(marker, 50, 20, 0, measure), 'within half the highlighter width')
+  assert.ok(hitShape(step, 210, 210, 0, measure))
+  assert.ok(!hitShape(step, 230, 230, 0, measure))
+  assert.ok(hitShape(redact, 350, 325, 0, measure), 'a redaction is hit anywhere inside')
+  assert.deepEqual(moveShape(step, 5, -5), { ...step, x: 205, y: 195 })
+  assert.deepEqual(shapeBounds(redact, measure), [300, 300, 400, 350])
+  const raw = serializeScene([marker, step, redact], 640, 480)
+  const parsed = parseScene(JSON.parse(JSON.stringify(raw)), 640, 480)
+  assert.deepEqual(parsed.map(({ id, ...shape }) => shape), raw.shapes)
+  assert.ok(sceneFits(parsed, 640, 480))
+  assert.equal(parseScene({ ...raw, shapes: [{ t: 'step', c: '#ff3b30', z: 30, x: 1, y: 1, n: 0 }] }, 640, 480).length, 0)
+})
+
+test('step numbers follow drawing order', () => {
+  const steps = [5, 9, 2].map((n, i) => withId({ t: 'step', c: '#ff3b30', z: 30, x: i, y: 0, n }))
+  const renumbered = renumberSteps([withId({ t: 'box', c: '#ff3b30', s: 4, p: [0, 0, 1, 1] }), ...steps])
+  assert.deepEqual(renumbered.filter((shape) => shape.t === 'step').map((shape) => shape.n), [1, 2, 3])
+  assert.equal(renumberSteps(renumbered), renumbered, 'unchanged when already in order')
 })

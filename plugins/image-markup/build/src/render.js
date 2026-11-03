@@ -1,7 +1,7 @@
 // Draws shapes onto a 2D context already transformed to image pixels. Paths and text metrics are
 // cached per shape object; shapes are immutable, so a cached entry never goes stale.
 import { encodePng } from './png.js'
-import { TEXT_LINE_HEIGHT, arrowHead, textHalo } from './scene.js'
+import { MARKER_ALPHA, TEXT_LINE_HEIGHT, arrowHead, redactBlock, textHalo } from './scene.js'
 
 const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'
 export const fontFor = (size) => `600 ${size}px ${FONT_FAMILY}`
@@ -68,7 +68,7 @@ function arrowPaths(shape) {
 function pathFor(shape) {
   let path = paths.get(shape)
   if (!path) {
-    if (shape.t === 'pen') path = penPath(shape.p)
+    if (shape.t === 'pen' || shape.t === 'marker') path = penPath(shape.p)
     else if (shape.t === 'arrow') path = arrowPaths(shape)
     else if (shape.t === 'ellipse') {
       const [x0, y0, x1, y1] = shape.p
@@ -91,7 +91,80 @@ export function haloFor(color) {
   return luminance > 150 ? 'rgba(0,0,0,0.82)' : 'rgba(255,255,255,0.92)'
 }
 
-export function drawShape(ctx, shape) {
+const STEP_FONT = (size) => `700 ${size}px ${FONT_FAMILY}`
+
+function drawStep(ctx, shape) {
+  const r = shape.z / 2
+  const halo = haloFor(shape.c)
+  ctx.beginPath()
+  ctx.arc(shape.x, shape.y, r, 0, Math.PI * 2)
+  ctx.fillStyle = shape.c
+  ctx.fill()
+  ctx.lineWidth = Math.max(1, shape.z * 0.08)
+  ctx.strokeStyle = halo
+  ctx.stroke()
+  const label = String(shape.n)
+  ctx.font = STEP_FONT(shape.z * (label.length > 2 ? 0.42 : label.length > 1 ? 0.5 : 0.6))
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  // The number takes the halo's tone, fully opaque, so it reads on its own disc.
+  ctx.fillStyle = halo.startsWith('rgba(0') ? '#000000' : '#ffffff'
+  ctx.fillText(label, shape.x, shape.y + shape.z * 0.03)
+}
+
+const mosaics = new WeakMap()
+
+/** A redaction's mosaic: the image under it averaged into coarse tiles, with per-tile noise. */
+function mosaicFor(shape, source) {
+  const cached = mosaics.get(shape)
+  if (cached?.source === source) return cached
+  const x0 = Math.max(0, Math.floor(Math.min(shape.p[0], shape.p[2])))
+  const y0 = Math.max(0, Math.floor(Math.min(shape.p[1], shape.p[3])))
+  const x1 = Math.min(source.width, Math.ceil(Math.max(shape.p[0], shape.p[2])))
+  const y1 = Math.min(source.height, Math.ceil(Math.max(shape.p[1], shape.p[3])))
+  const entry = { source, x0, y0, width: x1 - x0, height: y1 - y0, canvas: null }
+  if (entry.width > 0 && entry.height > 0) {
+    const block = redactBlock(source.width, source.height)
+    const cols = Math.max(1, Math.round(entry.width / block))
+    const rows = Math.max(1, Math.round(entry.height / block))
+    const canvas = new OffscreenCanvas(cols, rows)
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(source, x0, y0, entry.width, entry.height, 0, 0, cols, rows)
+    // Why noise: a clean average of each tile can be matched against rendered text and read back.
+    const data = ctx.getImageData(0, 0, cols, rows)
+    const d = data.data
+    for (let i = 0; i < d.length; i += 4) {
+      let h = Math.imul((i >> 2) ^ 0x9e3779b9, 0x85ebca6b)
+      h ^= h >>> 13
+      const noise = ((h & 0xff) - 128) / 6
+      d[i] += noise
+      d[i + 1] += noise
+      d[i + 2] += noise
+      d[i + 3] = 255
+    }
+    ctx.putImageData(data, 0, 0)
+    entry.canvas = canvas
+  }
+  mosaics.set(shape, entry)
+  return entry
+}
+
+function drawRedaction(ctx, shape, source) {
+  if (!source) return
+  const { canvas, x0, y0, width, height } = mosaicFor(shape, source)
+  if (!canvas) return
+  const smoothing = ctx.imageSmoothingEnabled
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(canvas, x0, y0, width, height)
+  ctx.imageSmoothingEnabled = smoothing
+}
+
+/** Draws one shape; `source` is the image bitmap, which a redaction pixelates. */
+export function drawShape(ctx, shape, source) {
+  if (shape.t === 'redact') return drawRedaction(ctx, shape, source)
+  if (shape.t === 'step') return drawStep(ctx, shape)
   ctx.fillStyle = shape.c
   ctx.strokeStyle = shape.c
   if (shape.t === 'text') {
@@ -120,6 +193,12 @@ export function drawShape(ctx, shape) {
     return
   }
   const path = pathFor(shape)
+  if (shape.t === 'marker') {
+    ctx.globalAlpha = MARKER_ALPHA
+    ctx.stroke(path)
+    ctx.globalAlpha = 1
+    return
+  }
   if (shape.t === 'arrow') {
     ctx.stroke(path.shaft)
     ctx.lineWidth = Math.max(1, shape.s * 0.5)
@@ -163,8 +242,8 @@ export function penSegments(ctx, style, p, from) {
   return count - 1
 }
 
-export function drawShapes(ctx, shapes, skip) {
-  for (const shape of shapes) if (shape !== skip) drawShape(ctx, shape)
+export function drawShapes(ctx, shapes, source) {
+  for (const shape of shapes) drawShape(ctx, shape, source)
 }
 
 /**
@@ -181,7 +260,7 @@ export async function renderFlattened(bitmap, shapes, type, options) {
     ctx.fillRect(0, 0, bitmap.width, bitmap.height)
   }
   ctx.drawImage(bitmap, 0, 0)
-  drawShapes(ctx, shapes)
+  drawShapes(ctx, shapes, bitmap)
   if (!png) return canvas.convertToBlob({ type, quality: 0.92 })
   return new Blob([await encodePng(ctx.getImageData(0, 0, bitmap.width, bitmap.height), options)], { type })
 }

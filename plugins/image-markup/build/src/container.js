@@ -339,6 +339,20 @@ export function writeMarkup(format, flattened, original, scene) {
   throw new Error(`cannot save markup into ${format} files`)
 }
 
+/** A freshly encoded PNG with the original's pixel density (pHYs), so it shows at the same size. */
+export function withPngDensity(encoded, original) {
+  const chunks = pngChunks(encoded)
+  const density = pngChunks(original)?.find((chunk) => chunk.type === 'pHYs')
+  const idat = chunks?.find((chunk) => chunk.type === 'IDAT')
+  if (!density || !idat || chunks.some((chunk) => chunk.type === 'pHYs')) return encoded
+  const bytes = original.subarray(density.start, density.end)
+  const out = new Uint8Array(encoded.length + bytes.length)
+  out.set(encoded.subarray(0, idat.start), 0)
+  out.set(bytes, idat.start)
+  out.set(encoded.subarray(idat.start), idat.start + bytes.length)
+  return out
+}
+
 /** Byte equality, comparing 4 bytes at a time when both views are aligned. */
 export function sameBytes(a, b) {
   if (a === b) return true

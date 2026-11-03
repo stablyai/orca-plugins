@@ -6,6 +6,9 @@
 //   box   { t: 'box',   c, s, p: [x1, y1, x2, y2] }        min corner, max corner
 //   ellipse { t: 'ellipse', c, s, p: [x1, y1, x2, y2] }    the box it fills
 //   text  { t: 'text',  c, z, x, y, text }                  z is the font size, (x, y) its top left
+//   marker { t: 'marker', c, s, p: [x0, y0, ...] }          a translucent highlighter stroke
+//   step  { t: 'step',  c, z, x, y, n }                     a numbered disc: z across, (x, y) its centre
+//   redact { t: 'redact', p: [x1, y1, x2, y2] }             pixelated; burned into the kept original on save
 //
 // `c` is a #rrggbb colour and `s` a stroke width. In memory each shape also has a numeric `id`.
 
@@ -14,9 +17,30 @@ export const MAX_SHAPES = 5000
 export const MAX_POINTS = 200_000
 export const MAX_TEXT = 4000
 const MAX_TEXT_TOTAL = 20_000
-const TYPES = new Set(['pen', 'arrow', 'box', 'ellipse', 'text'])
+const TYPES = new Set(['pen', 'arrow', 'box', 'ellipse', 'text', 'marker', 'step', 'redact'])
 /** Shapes defined by two corners, which share handles and normalizing. */
-export const isBoxLike = (shape) => shape.t === 'box' || shape.t === 'ellipse'
+export const isBoxLike = (shape) => shape.t === 'box' || shape.t === 'ellipse' || shape.t === 'redact'
+/** Shapes drawn through a list of points. */
+export const isStroke = (shape) => shape.t === 'pen' || shape.t === 'marker'
+/** Highlighter opacity, shared by drawing and the live stroke. */
+export const MARKER_ALPHA = 0.4
+
+/** Mosaic tile size for redactions on a width×height image, in image pixels: coarse enough that text can't be read back. */
+export const redactBlock = (width, height) => Math.max(6, Math.round(Math.min(width, height) / 60))
+
+/** Renumbers step markers 1, 2, 3… in drawing order; returns `shapes` itself when nothing changed. */
+export function renumberSteps(shapes) {
+  let n = 0
+  let changed = false
+  const next = shapes.map((shape) => {
+    if (shape.t !== 'step') return shape
+    n++
+    if (shape.n === n) return shape
+    changed = true
+    return { ...shape, n }
+  })
+  return changed ? next : shapes
+}
 
 let nextId = 1
 export const withId = (shape) => ({ ...shape, id: nextId++ })
@@ -41,6 +65,10 @@ export function shapeBounds(shape, measure) {
     const halo = textHalo(shape)
     return [shape.x - halo, shape.y - halo, shape.x + width + halo, shape.y + height + halo]
   }
+  if (shape.t === 'step') {
+    const r = shape.z / 2
+    return [shape.x - r, shape.y - r, shape.x + r, shape.y + r]
+  }
   const p = shape.p
   let x0 = Infinity
   let y0 = Infinity
@@ -52,7 +80,7 @@ export function shapeBounds(shape, measure) {
     if (p[i + 1] < y0) y0 = p[i + 1]
     if (p[i + 1] > y1) y1 = p[i + 1]
   }
-  const pad = shape.t === 'arrow' ? Math.max(shape.s / 2, arrowHead(shape.s).half) : shape.s / 2
+  const pad = shape.t === 'redact' ? 0 : shape.t === 'arrow' ? Math.max(shape.s / 2, arrowHead(shape.s).half) : shape.s / 2
   return [x0 - pad, y0 - pad, x1 + pad, y1 + pad]
 }
 
@@ -71,7 +99,8 @@ function segmentDistanceSq(px, py, ax, ay, bx, by) {
 export function hitShape(shape, x, y, tolerance, measure) {
   const [x0, y0, x1, y1] = shapeBounds(shape, measure)
   if (x < x0 - tolerance || x > x1 + tolerance || y < y0 - tolerance || y > y1 + tolerance) return false
-  if (shape.t === 'text') return true
+  if (shape.t === 'text' || shape.t === 'redact') return true
+  if (shape.t === 'step') return Math.hypot(x - shape.x, y - shape.y) <= shape.z / 2 + tolerance
   const reach = shape.s / 2 + tolerance
   const reachSq = reach * reach
   const p = shape.p
@@ -118,7 +147,7 @@ export function shapeAt(shapes, x, y, tolerance, measure) {
 }
 
 export function moveShape(shape, dx, dy) {
-  if (shape.t === 'text') return { ...shape, x: shape.x + dx, y: shape.y + dy }
+  if (shape.t === 'text' || shape.t === 'step') return { ...shape, x: shape.x + dx, y: shape.y + dy }
   const p = new Array(shape.p.length)
   for (let i = 0; i < p.length; i += 2) {
     p[i] = shape.p[i] + dx
@@ -129,6 +158,7 @@ export function moveShape(shape, dx, dy) {
 
 /** Drag handles in image pixels: arrow ends, and box and ellipse corners. */
 export function shapeHandles(shape) {
+  if (!shape.p) return []
   const p = shape.p
   if (shape.t === 'arrow') return [{ name: 'tail', x: p[0], y: p[1] }, { name: 'head', x: p[2], y: p[3] }]
   if (isBoxLike(shape)) {
@@ -218,9 +248,11 @@ export function serializeScene(shapes, width, height) {
     w: width,
     h: height,
     shapes: shapes.map(({ id, ...shape }) =>
-      shape.t === 'text'
+      shape.t === 'text' || shape.t === 'step'
         ? { ...shape, x: round1(shape.x), y: round1(shape.y), z: round1(shape.z) }
-        : { ...shape, s: round1(shape.s), p: shape.p.map(round1) }
+        : shape.t === 'redact'
+          ? { ...shape, p: shape.p.map(round1) }
+          : { ...shape, s: round1(shape.s), p: shape.p.map(round1) }
     )
   }
 }
@@ -241,7 +273,21 @@ export function sceneLimits(width, height) {
 }
 
 function shapeFits(shape, limits) {
-  if (!shape || !TYPES.has(shape.t) || !isColor(shape.c)) return false
+  if (!shape || !TYPES.has(shape.t)) return false
+  if (shape.t === 'redact') {
+    return Array.isArray(shape.p) && shape.p.length === 4 && shape.p.every((n) => isCoordinate(n, limits.coordinate))
+  }
+  if (!isColor(shape.c)) return false
+  if (shape.t === 'step') {
+    return (
+      Number.isSafeInteger(shape.n) &&
+      shape.n > 0 &&
+      shape.n <= MAX_SHAPES &&
+      isSize(shape.z, limits.textSize) &&
+      isCoordinate(shape.x, limits.coordinate) &&
+      isCoordinate(shape.y, limits.coordinate)
+    )
+  }
   if (shape.t === 'text') {
     return (
       typeof shape.text === 'string' &&
@@ -254,7 +300,7 @@ function shapeFits(shape, limits) {
   }
   const p = shape.p
   if (!isSize(shape.s, limits.stroke) || !Array.isArray(p) || p.length < 2 || p.length % 2 !== 0) return false
-  if (shape.t !== 'pen' && p.length !== 4) return false
+  if (!isStroke(shape) && p.length !== 4) return false
   return p.every((n) => isCoordinate(n, limits.coordinate))
 }
 
@@ -267,7 +313,7 @@ export function sceneFits(shapes, width, height, known = new Set()) {
   for (const shape of shapes) {
     if (!known.has(shape) && !shapeFits(shape, limits)) return false
     if (shape.t === 'text') text += shape.text.length
-    else points += shape.p.length / 2
+    else if (shape.p) points += shape.p.length / 2
   }
   return points <= MAX_POINTS && text <= MAX_TEXT_TOTAL
 }
@@ -294,9 +340,17 @@ export function parseScene(raw, width, height) {
       shapes.push(withId({ t: 'text', c: shape.c, z: shape.z, x: shape.x, y: shape.y, text: shape.text }))
       continue
     }
+    if (shape.t === 'step') {
+      shapes.push(withId({ t: 'step', c: shape.c, z: shape.z, x: shape.x, y: shape.y, n: shape.n }))
+      continue
+    }
+    if (shape.t === 'redact') {
+      shapes.push(withId({ t: 'redact', p: shape.p.slice() }))
+      continue
+    }
     if (points + shape.p.length / 2 > MAX_POINTS) continue
     points += shape.p.length / 2
     shapes.push(withId({ t: shape.t, c: shape.c, s: shape.s, p: shape.p.slice() }))
   }
-  return shapes
+  return renumberSteps(shapes)
 }
