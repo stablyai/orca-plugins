@@ -25,12 +25,17 @@ const CHUNK_BYTES = 16 * 1024
 const unsupported = () => { throw new ArchiveRejectedError('unsupported') }
 const tooLarge = () => { throw new ArchiveRejectedError('too-large') }
 
-/** Inflate every entry at the same offsets jszip reads; do not trust size declarations alone. */
+/**
+ * Inflate every entry at the same offsets jszip reads; do not trust size declarations alone.
+ * Resolves with the inflated bytes of the entries named in `keep`.
+ */
 export async function inspectArchive(bytes, {
   limits = ARCHIVE_LIMITS,
+  keep = [],
   cancelled = () => false,
   yieldControl = () => new Promise((resolve) => setTimeout(resolve, 0))
 } = {}) {
+  const kept = new Map()
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   let lastYield = performance.now()
   const checkpoint = async () => {
@@ -72,6 +77,7 @@ export async function inspectArchive(bytes, {
     const compressedSize = view.getUint32(cursor + 20, true)
     const declaredSize = view.getUint32(cursor + 24, true)
     const localOffset = view.getUint32(cursor + 42, true)
+    const name = new TextDecoder().decode(bytes.subarray(cursor + 46, cursor + 46 + view.getUint16(cursor + 28, true)))
     if ((flags & 1) || (method !== 0 && method !== 8) || compressedSize === 0xffffffff ||
       declaredSize === 0xffffffff || localOffset === 0xffffffff) unsupported()
     cursor += 46 + view.getUint16(cursor + 28, true) + view.getUint16(cursor + 30, true) + view.getUint16(cursor + 32, true)
@@ -82,8 +88,10 @@ export async function inspectArchive(bytes, {
     requireRange(dataStart, compressedSize)
     if (declaredSize > limits.maxTotalBytes - totalBytes) tooLarge()
     const sniffer = new MarkupSniffer()
+    const chunks = keep.includes(name) ? [] : null
     let size = 0
     const accept = (chunk) => {
+      chunks?.push(chunk.slice())
       size += chunk.byteLength
       if (size > declaredSize) unsupported()
       if (sniffer.feed(chunk) && size > limits.maxMarkupPartBytes) tooLarge()
@@ -106,10 +114,22 @@ export async function inspectArchive(bytes, {
       }
     }
     if (size !== declaredSize) unsupported()
+    if (chunks) kept.set(name, concat(chunks, size))
     totalBytes += size
     await checkpoint()
   }
   if (entries === 0 || cursor !== end) unsupported()
+  return kept
+}
+
+function concat(chunks, size) {
+  const out = new Uint8Array(size)
+  let at = 0
+  for (const chunk of chunks) {
+    out.set(chunk, at)
+    at += chunk.byteLength
+  }
+  return out
 }
 
 class MarkupSniffer {

@@ -3,13 +3,13 @@
   "id": "orca-docx",
   "publisher": "stablyai",
   "name": "Word Document Viewer",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "execution": "sandboxed-ui",
-  "description": "Preview Word (.docx) documents as read-only pages in Orca, with headers, footers, images and zoom controls.",
+  "description": "Read Word (.docx) documents in Orca: page layout, find, tracked changes, comments, links and zoom.",
   "license": "MIT",
   "repository": "https://github.com/stablyai/orca-plugins/tree/main/plugins/docx",
   "engines": {
-    "orca": ">=1.4.245"
+    "orca": ">=1.4.248"
   },
   "contributes": {
     "customEditors": [
