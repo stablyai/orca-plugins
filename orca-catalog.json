@@ -2446,6 +2446,60 @@
       ],
       "releases": [
         {
+          "version": "2.0.0",
+          "commit": "b9a1609e34e8939d0d4ac7269fd2b281c6af7a31",
+          "contentHash": "ad7070016cb53f68fa692b86ebc56dc431c98db5b580acd4e000ee0c21bc7a85",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "changelog": "SQL query console with results in the grid; sort, per-column filters and search for tables, views and query results; copy cells and rows; CSV export. Views show their rows. Still read-only. Needs Orca 1.4.248 and the desktop app; older Orca keeps 1.0.0.",
+          "name": "SQLite Browser",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "SQLite",
+              "detail": ".db, .sqlite, .sqlite3, .db3"
+            }
+          ],
+          "fileTypes": [
+            "db",
+            "sqlite",
+            "sqlite3",
+            "db3"
+          ],
+          "editorFileTypes": [
+            "db",
+            "sqlite",
+            "sqlite3",
+            "db3"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/sqlite-browser/images/cover.png",
+              "alt": "A music database in Orca: tracks sorted by length, filtered to lyrics with night, and the selected cell's full text below the grid",
+              "sha256": "b1d09b818f47e3d82df9c4ac432fc2ef1f0d94e6e9d2532aef2b2fcce7fbbc27",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/sqlite-browser/images/query.png",
+                "alt": "A SQL query over the tracks table, its rows sorted by length and filtered by title, in a light theme",
+                "sha256": "7d1078ccb573bb3d746bc7a6c5543ab1ec5fe8c9bfdda8e5e2e08574f7dd2dba",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/sqlite-browser/images/schema.png",
+                "alt": "The schema page listing the CREATE statement of every table, view, index and trigger",
+                "sha256": "d0cddaa1f820242ae286ef606d23ef69ee4afad4328b28ee83070016471779f3",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
+        {
           "version": "1.0.0",
           "commit": "af1b8721272ecc107361aac95c92f66b2a633a9d",
           "contentHash": "15716790a1964aed3c6dc7e4e23b7489810f1627676f88144b8273d4075f64d4",
