@@ -2065,8 +2065,8 @@
       "releases": [
         {
           "version": "2.0.0",
-          "commit": "4e5204305b38bede0ed08040939e8f55fbcd6d65",
-          "contentHash": "4d16fcfc7bdb83c1c73561dd92850d776ada268e425c8d82129606fc1d522a9e",
+          "commit": "d8f0c59824037fe101f994ad77ac1408594f786c",
+          "contentHash": "55f91d551a5e6695c209b880ecaf6257ab6f3510e077d61622047388038e7c1b",
           "execution": "sandboxed-ui",
           "minimumOrca": "1.4.248",
           "changelog": "Saving runs on Orca's document session: Orca owns the unsaved state and the save, and markup Orca had not received when the file changed outside (say, an agent replacing the screenshot) is moved onto the new image instead of dropped. New Highlighter, Step number and Redact tools; redactions are removed from the saved file, original included. Export saves a copy as a new PNG. Needs Orca 1.4.248.",
