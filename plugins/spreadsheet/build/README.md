@@ -73,7 +73,9 @@ XML, so a save changes only what was edited:
   data.
 
 Formulas recalculate as cells change (`src/formula-eval.js`, `recalculate` in
-`src/workbook-edits.js`): only formulas that read a changed cell, directly or through others. A
+`src/workbook-edits.js`): only formulas that read a changed cell, directly or through others,
+except after a row or column change, which recalculates every formula (results such as `ROW`,
+`MATCH` or `COUNTBLANK` depend on position). A
 formula with a function the calculator lacks, or an array formula, keeps showing its saved result
 (marked stale) and is saved without one, so the next desktop spreadsheet app to open it computes it.
 

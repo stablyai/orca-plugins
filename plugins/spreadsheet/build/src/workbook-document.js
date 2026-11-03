@@ -177,6 +177,8 @@ export function mergeWorkbooks(base, outside, mine) {
 /** Why `pending` cannot be replayed onto `outside` safely, or null when it can. */
 export function mergeRefusal(base, outside, pending) {
   if (pending.some((op) => op.type !== 'cells')) return 'rows or columns changed here'
+  // The outside write may have made an edited cell a table header (or totals) cell.
+  if (pending.some((op) => touchesLockedCell(outside.source, op.sheet, op.cells))) return 'an edited cell is now locked'
   const before = modelOf({ source: base.source, ops: base.ops.map(portableOp) })
   const after = modelOf({ source: outside.source, ops: outside.ops.map(portableOp) })
   if (!before || !after) return 'unreadable'

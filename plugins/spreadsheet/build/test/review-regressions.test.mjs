@@ -149,14 +149,42 @@ test('P3: an internal hyperlink follows the row it points at', () => {
   assert.match(sheetXml(writeWorkbook(target)), /<hyperlink ref="A1" location="Sheet1!A5" display="go"\/>/)
 })
 
-test('re-review P3: a row insert keeps the saved result of formulas it cannot calculate', () => {
-  const data = row(1, num('A1', 1) + `<c r="B1"><f>_xlfn.XLOOKUP(1,A1:A3,A1:A3)</f><v>1</v></c>`) + row(3, num('A3', 3))
+test('re-review #17: no saved result survives a row change; position-dependent ones are right or dropped', () => {
+  const formulas =
+    `<c r="A8"><f>COUNTBLANK(A1:A5)</f><v>0</v></c><c r="B8"><f>MATCH("c",A1:A5,0)</f><v>4</v></c>` +
+    `<c r="C8"><f>ROW(A5)</f><v>5</v></c><c r="D8"><f>ROWS(A1:A5)</f><v>5</v></c><c r="E8"><f>SUM(F1:F2)</f><v>3</v></c>`
+  const data = ['x', 'a', 'b', 'c', 'd'].map((v, i) => row(i + 1, str(`A${i + 1}`, v))).join('') + row(8, formulas)
   const target = value(workbook([{ name: 'Sheet1', data }]))
-  edit(target, { type: 'shift', sheet: 'Sheet1', axis: 'row', at: 1, count: 1 })
-  assert.match(sheetXml(writeWorkbook(target)), /<c r="B1"><f>_xlfn\.XLOOKUP\(1,A1:A4,A1:A4\)<\/f><v>1<\/v><\/c>/)
-  // Deleting a row with data does change its inputs, so the result is dropped for Excel to redo.
-  edit(target, { type: 'shift', sheet: 'Sheet1', axis: 'row', at: 3, count: -1 })
-  assert.match(sheetXml(writeWorkbook(target)), /<c r="B1"><f>_xlfn\.XLOOKUP\(1,A1:A3,A1:A3\)<\/f><\/c>/)
+  edit(target, { type: 'shift', sheet: 'Sheet1', axis: 'row', at: 2, count: 1 })
+  const xml = sheetXml(writeWorkbook(target))
+  assert.match(xml, /<c r="A9"><f>COUNTBLANK\(A1:A6\)<\/f><v>1<\/v><\/c>/, 'calculated: the inserted blank counts')
+  assert.match(xml, /<c r="B9"><f>MATCH\(&quot;c&quot;,A1:A6,0\)<\/f><\/c>/, 'not calculated: no stale result')
+  assert.match(xml, /<c r="C9"><f>ROW\(A6\)<\/f><\/c>/)
+  assert.match(xml, /<c r="D9"><f>ROWS\(A1:A6\)<\/f><\/c>/)
+  assert.match(xml, /<c r="E9"><f>SUM\(F1:F2\)<\/f><v>0<\/v><\/c>/, 'even untouched references are recalculated')
+  assert.match(strFromU8(unzipSync(writeWorkbook(target))['xl/workbook.xml']), /fullCalcOnLoad="1"/)
+})
+
+test('re-review #17: .ods formulas it cannot calculate lose their result after a row change', () => {
+  const target = value(styledOds())
+  typed(target, 'Budget', 'D2', '=ROW(B3)')
+  const before = strFromU8(unzipSync(writeWorkbook(target))['content.xml'])
+  assert.doesNotMatch(/<table:table-cell[^>]*of:=ROW[^>]*>/.exec(before)[0], /office:value=/)
+  edit(target, { type: 'shift', sheet: 'Budget', axis: 'row', at: 1, count: 1 })
+  const content = strFromU8(unzipSync(writeWorkbook(target))['content.xml'])
+  assert.doesNotMatch(/<table:table-cell[^>]*of:=ROW\(\[\.B4\]\)[^>]*>/.exec(content)[0], /office:value=/)
+  assert.match(content, /table:formula="of:=SUM\(\[\.B3:\.B4\]\)" office:value-type="float" office:value="1500"/)
+})
+
+test('re-review P3: an outside write that makes an edited cell a table header refuses the merge', () => {
+  const original = workbook([{ name: 'Sheet1', data: row(1, str('A1', 'Name')) + row(2, str('A2', 'x')) }])
+  const tableRel = `<Relationship Id="rId1" Type="${REL}/table" Target="../tables/table1.xml"/>`
+  const outside = value(workbook([{ name: 'Sheet1', data: row(1, str('A1', 'Name')) + row(2, str('A2', 'x')), rels: tableRel }], {
+    'xl/tables/table1.xml': `<table xmlns="${MAIN}" id="1" name="T" ref="A1:A2"><tableColumns count="1"><tableColumn id="1" name="Name"/></tableColumns></table>`
+  }))
+  const mine = value(original)
+  typed(mine, 'Sheet1', 'A1', 'Who')
+  assert.equal(mergeWorkbooks(value(original), outside, mine).rejected.length, 1)
 })
 
 test('re-review P3: a merge is refused when a formula this tab typed reads cells that moved', () => {
