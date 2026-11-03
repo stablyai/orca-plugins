@@ -13,6 +13,8 @@
 const PAYLOAD_VERSION = 1
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
 const PNG_CHUNK = 'orCA'
+// A stand-in's note (see withPendingMark); never written into a real save.
+const PENDING_CHUNK = 'orCp'
 const JPEG_MARKER = 0xe9 // APP9
 const JPEG_SIGNATURE = 'ORCA-MARKUP\0'
 // Segment length is a u16 that counts itself: 65535 - 2 (length) - 12 (signature) - 4 (index, count).
@@ -136,7 +138,7 @@ function writePngMarkup(flattened, original, scene) {
   const chunks = pngChunks(flattened)
   if (!chunks) throw new Error('the encoder returned an unreadable PNG')
   const payload = encodePayload(pngPixelCrc(flattened, chunks), scene, original)
-  const kept = chunks.filter((chunk) => chunk.type !== PNG_CHUNK)
+  const kept = chunks.filter((chunk) => chunk.type !== PNG_CHUNK && chunk.type !== PENDING_CHUNK)
   // The original's pixel density (pHYs): without it a Retina screenshot shows at twice its size
   // in Preview and Keynote. Colour chunks are not copied; the flattened pixels are sRGB.
   const density = chunks.some((chunk) => chunk.type === 'pHYs')
@@ -202,6 +204,12 @@ const isOurSegment = (bytes, segment) =>
   segment.end - segment.start >= JPEG_HEADER &&
   startsWith(bytes, segment.start + 4, JPEG_SIGNATURE_BYTES)
 
+const PENDING_SIGNATURE = ascii('ORCA-PENDING\0')
+/** Our segments, and the note an unsaved stand-in carries: neither counts toward the pixel CRC. */
+const isSkippedSegment = (bytes, segment) =>
+  isOurSegment(bytes, segment) ||
+  (segment.marker === JPEG_MARKER && startsWith(bytes, segment.start + 4, PENDING_SIGNATURE))
+
 function readJpegMarkup(bytes) {
   const parsed = jpegSegments(bytes)
   if (!parsed) return null
@@ -226,7 +234,7 @@ function readJpegMarkup(bytes) {
   // The pixel CRC covers the encoder's file, which is this file minus our segments.
   let crc = 0
   let from = 0
-  for (const segment of ours) {
+  for (const segment of parsed.segments.filter((candidate) => isSkippedSegment(bytes, candidate))) {
     crc = crc32(bytes, from, segment.start, crc)
     from = segment.end
   }
@@ -235,7 +243,7 @@ function readJpegMarkup(bytes) {
 }
 
 function withoutOurSegments(bytes, segments) {
-  const ours = segments.filter((segment) => isOurSegment(bytes, segment))
+  const ours = segments.filter((segment) => isSkippedSegment(bytes, segment))
   if (ours.length === 0) return bytes
   const out = new Uint8Array(bytes.length - ours.reduce((sum, segment) => sum + segment.end - segment.start, 0))
   let at = 0
@@ -337,6 +345,90 @@ export function writeMarkup(format, flattened, original, scene) {
   if (format === 'png') return writePngMarkup(flattened, original, scene)
   if (format === 'jpeg') return writeJpegMarkup(flattened, original, scene)
   throw new Error(`cannot save markup into ${format} files`)
+}
+
+/** A freshly encoded PNG with the original's pixel density (pHYs), so it shows at the same size. */
+export function withPngDensity(encoded, original) {
+  const chunks = pngChunks(encoded)
+  const density = pngChunks(original)?.find((chunk) => chunk.type === 'pHYs')
+  const idat = chunks?.find((chunk) => chunk.type === 'IDAT')
+  if (!density || !idat || chunks.some((chunk) => chunk.type === 'pHYs')) return encoded
+  const bytes = original.subarray(density.start, density.end)
+  const out = new Uint8Array(encoded.length + bytes.length)
+  out.set(encoded.subarray(0, idat.start), 0)
+  out.set(bytes, idat.start)
+  out.set(encoded.subarray(idat.start), idat.start + bytes.length)
+  return out
+}
+
+const PENDING_NOTE = ascii('image-markup: an edit is still being encoded')
+
+/**
+ * `bytes` with a harmless note added (a private PNG chunk, a JPEG comment), so it differs from the
+ * file while showing the same image. Marks the tab unsaved before an edit has finished encoding.
+ */
+export function withPendingMark(format, bytes) {
+  if (format === 'png') {
+    const end = pngChunks(bytes)?.find((chunk) => chunk.type === 'IEND')
+    if (!end) return null
+    const out = new Uint8Array(bytes.length + 12 + PENDING_NOTE.length)
+    out.set(bytes.subarray(0, end.start), 0)
+    let at = end.start
+    writeU32(out, at, PENDING_NOTE.length)
+    out.set(ascii(PENDING_CHUNK), at + 4)
+    out.set(PENDING_NOTE, at + 8)
+    writeU32(out, at + 8 + PENDING_NOTE.length, crc32(out, at + 4, at + 8 + PENDING_NOTE.length))
+    at += 12 + PENDING_NOTE.length
+    out.set(bytes.subarray(end.start), at)
+    return out
+  }
+  if (format === 'jpeg') {
+    const parsed = jpegSegments(bytes)
+    if (!parsed) return null
+    // After APP0 when present (JFIF wants it first), in an APP9 segment the pixel CRC skips.
+    const first = parsed.segments[0]
+    const at = first && first.marker === 0xe0 ? first.end : 2
+    const length = 2 + PENDING_SIGNATURE.length + PENDING_NOTE.length
+    const out = new Uint8Array(bytes.length + 2 + length)
+    out.set(bytes.subarray(0, at), 0)
+    out[at] = 0xff
+    out[at + 1] = JPEG_MARKER
+    writeU16(out, at + 2, length)
+    out.set(PENDING_SIGNATURE, at + 4)
+    out.set(PENDING_NOTE, at + 4 + PENDING_SIGNATURE.length)
+    out.set(bytes.subarray(at), at + 2 + length)
+    return out
+  }
+  return null
+}
+
+/** `bytes` without any stand-in note, so a note that reached disk is not kept by later saves. */
+export function withoutPendingMark(format, bytes) {
+  if (format === 'png') {
+    const chunks = pngChunks(bytes)
+    const notes = chunks?.filter((chunk) => chunk.type === PENDING_CHUNK) ?? []
+    return notes.length ? cut(bytes, notes) : bytes
+  }
+  if (format === 'jpeg') {
+    const segments = jpegSegments(bytes)?.segments ?? []
+    const notes = segments.filter((segment) => isSkippedSegment(bytes, segment) && !isOurSegment(bytes, segment))
+    return notes.length ? cut(bytes, notes) : bytes
+  }
+  return bytes
+}
+
+/** `bytes` with the given { start, end } ranges, in order, removed. */
+function cut(bytes, ranges) {
+  const out = new Uint8Array(bytes.length - ranges.reduce((sum, range) => sum + range.end - range.start, 0))
+  let at = 0
+  let from = 0
+  for (const range of ranges) {
+    out.set(bytes.subarray(from, range.start), at)
+    at += range.start - from
+    from = range.end
+  }
+  out.set(bytes.subarray(from), at)
+  return out
 }
 
 /** Byte equality, comparing 4 bytes at a time when both views are aligned. */

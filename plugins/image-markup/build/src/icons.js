@@ -9,11 +9,15 @@ export const ICONS = {
   box: icon('<rect x="3.5" y="5.5" width="17" height="13" rx="1.5"/>'),
   ellipse: icon('<ellipse cx="12" cy="12" rx="9" ry="7"/>'),
   text: icon('<path d="M5 7V5h14v2"/><path d="M12 5v14"/><path d="M9 19h6"/>'),
+  marker: icon('<path d="m9 15 7.5-7.5a2.1 2.1 0 0 1 3 3L12 18l-4 1z"/><path d="M4 21h7"/>'),
+  step: icon('<circle cx="12" cy="12" r="9"/><path d="M10.5 9.5 12.5 8v8"/>'),
+  redact: icon('<rect x="3.5" y="5.5" width="17" height="13" rx="1.5"/><path d="M3.5 10h17M3.5 14h17M9 5.5v13M15 5.5v13"/>'),
   undo: icon('<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>'),
   redo: icon('<path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/>'),
   delete: icon('<path d="M4 7h16"/><path d="M6 7l1 13h10l1-13"/><path d="M9.5 7V4h5v3"/>'),
   clear: icon('<path d="m7 21-4-4L14 6l7 7-8 8z"/><path d="m10 10 7 7"/><path d="M13 21h8"/>'),
   zoomOut: icon('<path d="M6 12h12"/>'),
   zoomIn: icon('<path d="M6 12h12"/><path d="M12 6v12"/>'),
+  export: icon('<path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 20h14"/>'),
   copy: icon('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>')
 }

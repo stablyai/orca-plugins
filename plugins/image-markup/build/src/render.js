@@ -1,7 +1,7 @@
 // Draws shapes onto a 2D context already transformed to image pixels. Paths and text metrics are
 // cached per shape object; shapes are immutable, so a cached entry never goes stale.
 import { encodePng } from './png.js'
-import { TEXT_LINE_HEIGHT, arrowHead, textHalo } from './scene.js'
+import { MARKER_ALPHA, TEXT_LINE_HEIGHT, arrowHead, textHalo } from './scene.js'
 
 const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'
 export const fontFor = (size) => `600 ${size}px ${FONT_FAMILY}`
@@ -68,7 +68,7 @@ function arrowPaths(shape) {
 function pathFor(shape) {
   let path = paths.get(shape)
   if (!path) {
-    if (shape.t === 'pen') path = penPath(shape.p)
+    if (shape.t === 'pen' || shape.t === 'marker') path = penPath(shape.p)
     else if (shape.t === 'arrow') path = arrowPaths(shape)
     else if (shape.t === 'ellipse') {
       const [x0, y0, x1, y1] = shape.p
@@ -91,7 +91,86 @@ export function haloFor(color) {
   return luminance > 150 ? 'rgba(0,0,0,0.82)' : 'rgba(255,255,255,0.92)'
 }
 
-export function drawShape(ctx, shape) {
+const STEP_FONT = (size) => `700 ${size}px ${FONT_FAMILY}`
+
+function drawStep(ctx, shape) {
+  const r = shape.z / 2
+  const halo = haloFor(shape.c)
+  ctx.beginPath()
+  ctx.arc(shape.x, shape.y, r, 0, Math.PI * 2)
+  ctx.fillStyle = shape.c
+  ctx.fill()
+  ctx.lineWidth = Math.max(1, shape.z * 0.08)
+  ctx.strokeStyle = halo
+  ctx.stroke()
+  const label = String(shape.n)
+  ctx.font = STEP_FONT(shape.z * (label.length > 2 ? 0.42 : label.length > 1 ? 0.5 : 0.6))
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  // The number takes the halo's tone, fully opaque, so it reads on its own disc.
+  ctx.fillStyle = halo.startsWith('rgba(0') ? '#000000' : '#ffffff'
+  ctx.fillText(label, shape.x, shape.y + shape.z * 0.03)
+}
+
+const fills = new WeakMap()
+
+/** A redaction's colour: the mean of the image under it, so the patch blends in but holds nothing. */
+function fillFor(shape, source) {
+  const cached = fills.get(shape)
+  if (cached?.source === source) return cached
+  const [x0, y0, x1, y1] = redactRect(shape, source)
+  const entry = { source, x0, y0, width: x1 - x0, height: y1 - y0, color: '#808080', hatch: 'rgba(0,0,0,0.18)' }
+  if (entry.width > 0 && entry.height > 0) {
+    const ctx = new OffscreenCanvas(1, 1).getContext('2d', { willReadFrequently: true })
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(source, x0, y0, entry.width, entry.height, 0, 0, 1, 1)
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
+    entry.color = `rgb(${r},${g},${b})`
+    entry.hatch = 0.2126 * r + 0.7152 * g + 0.0722 * b > 140 ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.22)'
+  }
+  fills.set(shape, entry)
+  return entry
+}
+
+/** A redaction's area in whole image pixels, clipped to the image. */
+function redactRect(shape, source) {
+  return [
+    Math.max(0, Math.floor(Math.min(shape.p[0], shape.p[2]))),
+    Math.max(0, Math.floor(Math.min(shape.p[1], shape.p[3]))),
+    Math.min(source.width, Math.ceil(Math.max(shape.p[0], shape.p[2]))),
+    Math.min(source.height, Math.ceil(Math.max(shape.p[1], shape.p[3])))
+  ]
+}
+
+// Why a flat fill and not a mosaic or blur: those keep a signal that can be matched back to text.
+function drawRedaction(ctx, shape, source) {
+  if (!source) return
+  const { x0, y0, width, height, color, hatch } = fillFor(shape, source)
+  if (width <= 0 || height <= 0) return
+  ctx.save()
+  ctx.fillStyle = color
+  ctx.fillRect(x0, y0, width, height)
+  // Diagonal hatching marks the patch as redacted rather than empty.
+  ctx.beginPath()
+  ctx.rect(x0, y0, width, height)
+  ctx.clip()
+  const step = Math.max(8, Math.min(source.width, source.height) / 60)
+  ctx.strokeStyle = hatch
+  ctx.lineWidth = step / 4
+  ctx.beginPath()
+  for (let d = -height; d < width; d += step) {
+    ctx.moveTo(x0 + d, y0 + height)
+    ctx.lineTo(x0 + d + height, y0)
+  }
+  ctx.stroke()
+  ctx.restore()
+}
+
+/** Draws one shape; `source` is the image bitmap, whose mean colour a redaction takes. */
+export function drawShape(ctx, shape, source) {
+  if (shape.t === 'redact') return drawRedaction(ctx, shape, source)
+  if (shape.t === 'step') return drawStep(ctx, shape)
   ctx.fillStyle = shape.c
   ctx.strokeStyle = shape.c
   if (shape.t === 'text') {
@@ -120,6 +199,12 @@ export function drawShape(ctx, shape) {
     return
   }
   const path = pathFor(shape)
+  if (shape.t === 'marker') {
+    ctx.globalAlpha = MARKER_ALPHA
+    ctx.stroke(path)
+    ctx.globalAlpha = 1
+    return
+  }
   if (shape.t === 'arrow') {
     ctx.stroke(path.shaft)
     ctx.lineWidth = Math.max(1, shape.s * 0.5)
@@ -163,8 +248,8 @@ export function penSegments(ctx, style, p, from) {
   return count - 1
 }
 
-export function drawShapes(ctx, shapes, skip) {
-  for (const shape of shapes) if (shape !== skip) drawShape(ctx, shape)
+export function drawShapes(ctx, shapes, source) {
+  for (const shape of shapes) drawShape(ctx, shape, source)
 }
 
 /**
@@ -181,7 +266,7 @@ export async function renderFlattened(bitmap, shapes, type, options) {
     ctx.fillRect(0, 0, bitmap.width, bitmap.height)
   }
   ctx.drawImage(bitmap, 0, 0)
-  drawShapes(ctx, shapes)
+  drawShapes(ctx, shapes, bitmap)
   if (!png) return canvas.convertToBlob({ type, quality: 0.92 })
   return new Blob([await encodePng(ctx.getImageData(0, 0, bitmap.width, bitmap.height), options)], { type })
 }

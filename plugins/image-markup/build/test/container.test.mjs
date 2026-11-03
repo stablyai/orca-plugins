@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { deflateSync } from 'node:zlib'
-import { crc32, detectFormat, imageSize, readMarkup, sameBytes, writeMarkup } from '../src/container.js'
+import { crc32, detectFormat, imageSize, readMarkup, sameBytes, withPendingMark, writeMarkup } from '../src/container.js'
 
 function chunk(type, data) {
   const out = Buffer.alloc(12 + data.length)
@@ -186,4 +186,20 @@ test('sameBytes compares aligned and unaligned views', () => {
   shifted.set(a, 1)
   assert.ok(sameBytes(a, shifted.subarray(1)))
   assert.ok(!sameBytes(a, a.subarray(1)))
+})
+
+test('a stand-in\'s note keeps the markup readable, and a real save drops it', () => {
+  const scene = { v: 1, w: 2, h: 2, shapes: [] }
+  for (const [format, flattened, original] of [
+    ['png', png(2, 2, [255, 0, 0]), png(2, 2, [0, 0, 255])],
+    ['jpeg', jpeg([9, 9]), jpeg()]
+  ]) {
+    const saved = writeMarkup(format, flattened, original, scene)
+    const noted = withPendingMark(format, saved)
+    assert.equal(detectFormat(noted), format)
+    assert.ok(!sameBytes(noted, saved), format)
+    assert.ok(sameBytes(readMarkup(noted).original, original), `${format}: still readable`)
+    // Written again from the noted file (as a stand-in does), the note is gone.
+    assert.ok(sameBytes(writeMarkup(format, noted, original, scene), saved), `${format}: no note left`)
+  }
 })

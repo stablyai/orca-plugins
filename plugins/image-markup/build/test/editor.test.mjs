@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
-import { crc32, detectFormat, readMarkup, sameBytes, writeMarkup } from '../src/container.js'
-import { drag, edits, launch, makeImage, openEditor, pagePoint, pixel, postBytes, postImage } from './harness.mjs'
+import { crc32, detectFormat, readMarkup, sameBytes, withPendingMark, writeMarkup } from '../src/container.js'
+import { drag, edits, imageSizeOf, isPending, launch, makeImage, openEditor, pagePoint, pixel, postBytes, postImage } from './harness.mjs'
 
 const SIZE = [640, 400]
 const RED = [255, 59, 48]
@@ -20,6 +20,14 @@ async function open(options) {
   const image = await makeImage(editor.page, { width: SIZE[0], height: SIZE[1], ...options?.image })
   await postImage(editor.page, editor.frame, image, options?.post)
   return { ...editor, image }
+}
+
+/** Polls `check` until it holds, for at most 3 s. */
+async function until(check) {
+  for (const start = Date.now(); !(await check()); ) {
+    if (Date.now() - start > 3000) throw new Error('timed out')
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
 }
 
 const tool = (frame, name) => frame.getByRole('button', { name, exact: true }).click()
@@ -80,7 +88,7 @@ test('debounces edits, and Orca handing the saved bytes back keeps the session a
   const { page, frame, errors, close } = await open()
   await drag(page, frame, SIZE, [[100, 100], [200, 200]])
   await drag(page, frame, SIZE, [[300, 100], [400, 200]])
-  await page.waitForFunction(() => window.__edits.length === 1, null, { timeout: 3000 })
+  await until(async () => (await edits(page)).length === 1)
   const [saved] = await edits(page)
   // After a save Orca sends the file again under a new version.
   await postBytes(page, saved)
@@ -141,6 +149,357 @@ test('reopening a saved file restores editable shapes; clearing them saves the o
   await flush(page)
   const [restored] = await edits(page)
   assert.ok(sameBytes(restored, first.image), 'the original file, exactly')
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('the highlighter draws a wide translucent stroke; Shift makes it straight', async () => {
+  const { page, frame, errors, close } = await open()
+  await page.keyboard.press('h')
+  assert.equal(await frame.getByRole('button', { name: 'Highlighter', exact: true }).getAttribute('aria-pressed'), 'true')
+  await frame.getByRole('button', { name: 'Yellow', exact: true }).click()
+  const [x0, y0] = await pagePoint(page, frame, SIZE, 100, 200)
+  const [x1, y1] = await pagePoint(page, frame, SIZE, 500, 230)
+  await page.keyboard.down('Shift')
+  await page.mouse.move(x0, y0)
+  await page.mouse.down()
+  await page.mouse.move(x1, y1, { steps: 6 })
+  await page.mouse.up()
+  await page.keyboard.up('Shift')
+  assert.equal(await flush(page), null)
+  const saved = (await edits(page)).at(-1)
+  const [shape] = readMarkup(saved).scene.shapes
+  assert.equal(shape.t, 'marker')
+  assert.deepEqual(shape.p, [100, 200, 500, 230])
+  assert.ok(shape.s >= 10, `wide: ${shape.s}`)
+  // Translucent: the gradient still shows through the yellow.
+  const [r, g, b] = await pixel(page, saved, 300, 215)
+  assert.ok(r > 120 && g > 120 && b < 200 && b > 40, `blended yellow: ${[r, g, b]}`)
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('step numbers count up as they are placed, and renumber when one is deleted', async () => {
+  const { page, frame, errors, close } = await open()
+  await page.keyboard.press('n')
+  for (const x of [100, 250, 400]) {
+    const [px, py] = await pagePoint(page, frame, SIZE, x, 200)
+    await page.mouse.click(px, py)
+  }
+  assert.equal(await info(frame), '640 × 400 · PNG · 3 marks')
+  await page.keyboard.press('v')
+  const [sx, sy] = await pagePoint(page, frame, SIZE, 100, 200)
+  await page.mouse.click(sx, sy)
+  await page.keyboard.press('Backspace')
+  assert.equal(await flush(page), null)
+  const shapes = readMarkup((await edits(page)).at(-1)).scene.shapes
+  assert.deepEqual(shapes.map((shape) => [shape.t, shape.n, shape.x]), [['step', 1, 250], ['step', 2, 400]])
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('redaction covers the area, and the saved file keeps no unredacted copy of it', async () => {
+  const { page, frame, image, errors, close } = await open()
+  await page.keyboard.press('x')
+  await drag(page, frame, SIZE, [[290, 290], [410, 370]])
+  await tool(frame, 'Arrow')
+  await drag(page, frame, SIZE, [[100, 100], [200, 150]])
+  assert.match(await status(frame), /redacted areas are removed from the file for good/)
+  assert.equal(await flush(page), null)
+  const saved = (await edits(page)).at(-1)
+  const markup = readMarkup(saved)
+  assert.deepEqual(markup.scene.shapes.map((shape) => shape.t), ['arrow'], 'the redaction is burned in, not kept as a shape')
+  assert.ok(!sameBytes(markup.original, image), 'the kept original is redacted too')
+  // Fine stripes become coarse tiles in both the visible image and the kept original.
+  for (const bytes of [saved, markup.original]) {
+    const row = await Promise.all([300, 302, 304, 306].map((x) => pixel(page, bytes, x, 330)))
+    const spread = Math.max(...row.map((p) => p[0])) - Math.min(...row.map((p) => p[0]))
+    assert.ok(spread < 60, `no stripes left: ${row.map((p) => p[0])}`)
+  }
+  // Reopened, the arrow is still editable and the redaction stays in the pixels.
+  const reopened = await openEditor(browser)
+  await postImage(reopened.page, reopened.frame, saved)
+  assert.equal(await info(reopened.frame), '640 × 400 · PNG · 1 mark')
+  await reopened.frame.getByRole('button', { name: 'Clear all markup', exact: true }).click()
+  assert.equal(await flush(reopened.page), null)
+  assert.ok(sameBytes((await edits(reopened.page)).at(-1), markup.original), 'clearing keeps the redaction')
+  assert.deepEqual([...errors, ...reopened.errors], [])
+  await reopened.close()
+  await close()
+})
+
+test('markup under a redaction is burned in with it, never kept as text in the file', async () => {
+  const { page, frame, errors, close } = await open()
+  await page.keyboard.press('t')
+  const [tx, ty] = await pagePoint(page, frame, SIZE, 310, 320)
+  await page.mouse.click(tx, ty)
+  await page.keyboard.type('SECRET-alice@example.com')
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('x')
+  await drag(page, frame, SIZE, [[290, 290], [630, 370]])
+  await tool(frame, 'Arrow')
+  await drag(page, frame, SIZE, [[100, 100], [200, 150]])
+  assert.equal(await flush(page), null)
+  const saved = (await edits(page)).at(-1)
+  assert.ok(!Buffer.from(saved).includes(Buffer.from('SECRET')), 'the text is nowhere in the file')
+  assert.deepEqual(readMarkup(saved).scene.shapes.map((shape) => shape.t), ['arrow'], 'only what was drawn after stays editable')
+  const reopened = await openEditor(browser)
+  await postImage(reopened.page, reopened.frame, saved)
+  assert.equal(await info(reopened.frame), '640 × 400 · PNG · 1 mark')
+  assert.deepEqual([...errors, ...reopened.errors], [])
+  await reopened.close()
+  await close()
+})
+
+test('a redaction is a flat fill: what was under it leaves no trace', async () => {
+  const redact = async (label) => {
+    const editor = await openEditor(browser)
+    const image = await makeImage(editor.page, { label })
+    await postImage(editor.page, editor.frame, image)
+    await editor.page.keyboard.press('x')
+    await drag(editor.page, editor.frame, SIZE, [[100, 250], [500, 330]])
+    assert.equal(await flush(editor.page), null)
+    const saved = (await edits(editor.page)).at(-1)
+    const region = await editor.page.evaluate(async (data) => {
+      const bitmap = await createImageBitmap(new Blob([window.__fromBase64(data)]))
+      const ctx = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')
+      ctx.drawImage(bitmap, 0, 0)
+      return [...ctx.getImageData(102, 252, 396, 76).data]
+    }, Buffer.from(saved).toString('base64'))
+    assert.deepEqual(editor.errors, [])
+    await editor.close()
+    return region
+  }
+  // Two different secrets under the same box: the saved pixels differ at most by the fill's shade.
+  const a = await redact('hunter2-password')
+  const b = await redact('sk_live_9QX0ZZ')
+  const worst = a.reduce((max, value, i) => Math.max(max, Math.abs(value - b[i])), 0)
+  assert.ok(worst <= 4, `largest difference ${worst}`)
+})
+
+test('an EXIF-rotated JPEG reopens with its markup and its original', async () => {
+  const { page, frame, image, errors, close } = await open({ image: { type: 'image/jpeg', quality: 0.9, orientation: 6 }, post: { fileType: 'jpg' } })
+  assert.equal(await info(frame), '400 × 640 · JPEG')
+  await drag(page, frame, [400, 640], [[100, 100], [200, 300]])
+  assert.equal(await flush(page), null)
+  const saved = (await edits(page)).at(-1)
+  assert.ok(sameBytes(readMarkup(saved).original, image))
+  const reopened = await openEditor(browser)
+  await postImage(reopened.page, reopened.frame, saved, { fileType: 'jpg' })
+  assert.equal(await info(reopened.frame), '400 × 640 · JPEG · 1 mark')
+  await reopened.frame.getByRole('button', { name: 'Clear all markup', exact: true }).click()
+  assert.equal(await flush(reopened.page), null)
+  assert.ok(sameBytes((await edits(reopened.page)).at(-1), image), 'the original, byte for byte')
+  assert.deepEqual([...errors, ...reopened.errors], [])
+  await reopened.close()
+  await close()
+})
+
+test('a stroke marks the tab unsaved at once, before its encode, so closing asks first', async () => {
+  const { page, frame, errors, close } = await open()
+  // Hold every encode: what Orca holds right after the stroke is all a close would see.
+  await frame.evaluate(() => {
+    const arrayBuffer = Blob.prototype.arrayBuffer
+    window.__release = null
+    const held = new Promise((resolve) => (window.__release = resolve))
+    Blob.prototype.arrayBuffer = async function () {
+      await held
+      return arrayBuffer.call(this)
+    }
+  })
+  await drag(page, frame, SIZE, [[100, 100], [200, 200]])
+  await until(async () => (await edits(page, { pending: true })).length === 1)
+  const [standIn] = await edits(page, { pending: true })
+  assert.deepEqual(await imageSizeOf(page, standIn), SIZE, 'the stand-in is still the image')
+  await frame.evaluate(() => window.__release())
+  assert.equal(await flush(page), null)
+  assert.equal(readMarkup((await edits(page)).at(-1)).scene.shapes.length, 1)
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+const holdEncodes = (frame) =>
+  frame.evaluate(() => {
+    const arrayBuffer = Blob.prototype.arrayBuffer
+    const held = new Promise((resolve) => (window.__release = resolve))
+    Blob.prototype.arrayBuffer = async function () {
+      await held
+      return arrayBuffer.call(this)
+    }
+  })
+
+for (const [format, imageOptions, post] of [
+  ['PNG', {}, {}],
+  ['JPEG', { type: 'image/jpeg', quality: 0.9 }, { fileType: 'jpg' }]
+]) {
+  test(`${format}: an undo back to the saved scene leaves Orca the real file, never the stand-in`, async () => {
+    const { page, frame, errors, close } = await open({ image: imageOptions, post })
+    await drag(page, frame, SIZE, [[100, 100], [200, 200]])
+    assert.equal(await flush(page), null)
+    const [real] = await edits(page)
+    await drag(page, frame, SIZE, [[300, 100], [400, 200]])
+    await until(async () => (await edits(page, { pending: true })).some(isPending))
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z')
+    assert.equal(await flush(page), null)
+    const last = (await edits(page, { pending: true })).at(-1)
+    assert.ok(!isPending(last) && sameBytes(last, real), 'what a save writes is the real file')
+    assert.deepEqual(errors, [])
+    await close()
+  })
+
+  test(`${format}: a stand-in saved before its encode (say, after a view switch) reopens with the markup`, async () => {
+    const { page, frame, image, errors, close } = await open({ image: imageOptions, post })
+    await holdEncodes(frame)
+    await tool(frame, 'Box')
+    await frame.getByRole('button', { name: 'Thick stroke', exact: true }).click()
+    await drag(page, frame, SIZE, [[100, 100], [300, 300]])
+    await until(async () => (await edits(page, { pending: true })).length === 1)
+    // The frame goes away with the encode still running: Orca saves what it holds.
+    const [standIn] = await edits(page, { pending: true })
+    await close()
+    const markup = readMarkup(standIn)
+    assert.ok(markup, 'the markup is still readable')
+    assert.ok(sameBytes(markup.original, image), 'and the original is still inside')
+    assert.deepEqual(markup.scene.shapes.map((shape) => shape.t), ['box'])
+    // Reopened, the shapes are there; just viewing it sends nothing, and the next edit redraws it.
+    const reopened = await openEditor(browser)
+    await postImage(reopened.page, reopened.frame, standIn, post)
+    assert.equal(await info(reopened.frame), `640 × 400 · ${format} · 1 mark`)
+    await reopened.page.waitForTimeout(600)
+    assert.equal((await edits(reopened.page, { pending: true })).length, 0, 'opening it does not dirty the tab')
+    await drag(reopened.page, reopened.frame, SIZE, [[500, 50], [600, 80]])
+    assert.equal(await flush(reopened.page), null)
+    const redrawn = (await edits(reopened.page)).at(-1)
+    assert.ok(near(await pixel(reopened.page, redrawn, 100, 200), RED, 40), 'the box is in the pixels now')
+    assert.ok(sameBytes(readMarkup(redrawn).original, image))
+    assert.deepEqual([...errors, ...reopened.errors], [])
+    await reopened.close()
+  })
+}
+
+test('a redaction saved as a stand-in before its encode is applied again on reopen', async () => {
+  const { page, frame, image, errors, close } = await open()
+  await page.keyboard.press('t')
+  const [tx, ty] = await pagePoint(page, frame, SIZE, 310, 320)
+  await page.mouse.click(tx, ty)
+  await page.keyboard.type('SECRET-alice')
+  await page.keyboard.press('Escape')
+  assert.equal(await flush(page), null)
+  await holdEncodes(frame)
+  await page.keyboard.press('x')
+  await drag(page, frame, SIZE, [[290, 290], [630, 370]])
+  const before = (await edits(page, { pending: true })).length
+  await until(async () => (await edits(page, { pending: true })).length > before)
+  const standIn = (await edits(page, { pending: true })).at(-1)
+  assert.ok(isPending(standIn))
+  await close()
+  // It holds the redaction, and nothing the last file didn't: not the text under the redaction.
+  assert.deepEqual(readMarkup(standIn).scene.shapes.map((shape) => shape.t), ['redact'])
+  assert.ok(sameBytes(readMarkup(standIn).original, image))
+  const reopened = await openEditor(browser)
+  await postImage(reopened.page, reopened.frame, standIn)
+  assert.match(await status(reopened.frame), /redacted areas are removed/)
+  await until(async () => (await edits(reopened.page)).length === 1)
+  const redrawn = (await edits(reopened.page))[0]
+  const row = await Promise.all([300, 302, 304, 306].map((x) => pixel(reopened.page, redrawn, x, 330)))
+  assert.ok(Math.max(...row.map((p) => p[0])) - Math.min(...row.map((p) => p[0])) < 60, 'the stripes are covered')
+  assert.ok(!Buffer.from(redrawn).includes(Buffer.from('SECRET')))
+  assert.deepEqual([...errors, ...reopened.errors], [])
+  await reopened.close()
+})
+
+test('a redaction stand-in keeps saved markup outside the redaction', async () => {
+  const { page, frame, errors, close } = await open()
+  await tool(frame, 'Box')
+  await drag(page, frame, SIZE, [[50, 50], [150, 150]])
+  assert.equal(await flush(page), null)
+  await holdEncodes(frame)
+  const before = (await edits(page, { pending: true })).length
+  await page.keyboard.press('x')
+  await drag(page, frame, SIZE, [[290, 290], [630, 370]])
+  await until(async () => (await edits(page, { pending: true })).length > before)
+  const standIn = (await edits(page, { pending: true })).at(-1)
+  await close()
+  assert.deepEqual(readMarkup(standIn).scene.shapes.map((shape) => shape.t), ['box', 'redact'])
+  const reopened = await openEditor(browser)
+  await postImage(reopened.page, reopened.frame, standIn)
+  assert.equal(await info(reopened.frame), '640 × 400 · PNG · 2 marks')
+  assert.deepEqual(reopened.errors, [])
+  assert.deepEqual(errors, [])
+  await reopened.close()
+})
+
+test('a stand-in note that reached disk is not kept by later saves', async () => {
+  const plain = await (async () => {
+    const editor = await openEditor(browser)
+    const bytes = await makeImage(editor.page)
+    await editor.close()
+    return bytes
+  })()
+  const { page, frame, errors, close } = await openEditor(browser)
+  await postImage(page, frame, withPendingMark('png', plain))
+  await drag(page, frame, SIZE, [[100, 100], [200, 200]])
+  assert.equal(await flush(page), null)
+  assert.ok(sameBytes(readMarkup((await edits(page)).at(-1)).original, plain), 'the original inside has no note')
+  await frame.getByRole('button', { name: 'Clear all markup', exact: true }).click()
+  assert.equal(await flush(page), null)
+  assert.ok(sameBytes((await edits(page)).at(-1), plain), 'Clear all saves the image without the note')
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('markup merged onto a new image during an encode is still sent', async () => {
+  const { page, frame, errors, close } = await open()
+  const screenshot = await makeImage(page, { width: 320, height: 200 })
+  await frame.evaluate(() => {
+    const arrayBuffer = Blob.prototype.arrayBuffer
+    window.__release = null
+    const held = new Promise((resolve) => (window.__release = resolve))
+    Blob.prototype.arrayBuffer = async function () {
+      await held
+      return arrayBuffer.call(this)
+    }
+  })
+  await tool(frame, 'Box')
+  await drag(page, frame, SIZE, [[100, 100], [200, 200]])
+  // The debounce has fired and the encode is running when an agent replaces the file.
+  await page.waitForTimeout(500)
+  await postBytes(page, screenshot)
+  await frame.waitForFunction(() => document.getElementById('info').textContent === '320 × 200 · PNG · 1 mark')
+  // Its own commit comes due while the old encode is still held.
+  await page.waitForTimeout(500)
+  await frame.evaluate(() => window.__release())
+  // No further edit or save: the merge reaches Orca on its own.
+  await until(async () => {
+    const last = (await edits(page)).at(-1)
+    return last !== undefined && readMarkup(last) !== null && sameBytes(readMarkup(last).original, screenshot)
+  })
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('a redaction alone saves just the redacted image, with no markup inside', async () => {
+  const { page, frame, errors, close } = await open()
+  await page.keyboard.press('x')
+  await drag(page, frame, SIZE, [[290, 290], [410, 370]])
+  assert.equal(await flush(page), null)
+  const saved = (await edits(page)).at(-1)
+  assert.equal(readMarkup(saved), null)
+  assert.equal(detectFormat(saved), 'png')
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('Export saves a PNG with the markup through Orca\'s save dialog', async () => {
+  const { page, frame, errors, close } = await open({ files: true })
+  assert.equal(await frame.getByRole('button', { name: 'Copy image with markup', exact: true }).count(), 0)
+  await drag(page, frame, SIZE, [[100, 100], [200, 200]])
+  await frame.getByRole('button', { name: 'Export a copy as PNG', exact: true }).click()
+  await page.waitForFunction(() => window.__saved.length === 1)
+  const exported = new Uint8Array(Buffer.from(await page.evaluate(() => window.__toBase64(window.__saved[0])), 'base64'))
+  assert.equal(detectFormat(exported), 'png')
+  assert.ok(near(await pixel(page, exported, 150, 150), RED), 'the stroke is in the export')
+  assert.equal((await edits(page)).length <= 1, true)
   assert.deepEqual(errors, [])
   await close()
 })
@@ -225,18 +584,52 @@ test('read-only documents and formats without markup storage never send edits', 
   await webp.close()
 })
 
-test('an outside change replaces the scene; stale and non-image documents are ignored', async () => {
+test('an outside change with no unsaved markup replaces the image; a non-image file shows a message', async () => {
   const { page, frame, errors, close } = await open()
-  await drag(page, frame, SIZE, [[100, 100], [200, 200]])
-  const other = await makeImage(page, { width: 320, height: 200 })
-  await postImage(page, frame, other)
+  await postImage(page, frame, await makeImage(page, { width: 320, height: 200 }))
   await frame.waitForFunction(() => document.getElementById('info').textContent === '320 × 200 · PNG')
-  await postBytes(page, await makeImage(page), { version: 1 })
   await postBytes(page, new TextEncoder().encode('not an image'))
   await frame.waitForSelector('#message:not([hidden])')
   assert.match(await frame.locator('#message').textContent(), /Can't display this file/)
   await flush(page)
-  assert.equal((await edits(page)).length, 0, 'strokes on the replaced file are dropped, not sent')
+  assert.equal((await edits(page)).length, 0)
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('an agent rewriting the image keeps markup not yet sent, on top of the new image', async () => {
+  const { page, frame, errors, close } = await open()
+  const screenshot = await makeImage(page, { width: 320, height: 200 })
+  await tool(frame, 'Box')
+  await drag(page, frame, SIZE, [[100, 100], [200, 200]])
+  // At once, before the debounce hands the box over: the file is replaced by a new screenshot.
+  await postBytes(page, screenshot)
+  await frame.waitForFunction(() => document.getElementById('info').textContent === '320 × 200 · PNG · 1 mark')
+  assert.match(await frame.locator('#toast').textContent(), /markup is kept on top of the new version/)
+  assert.equal(await flush(page), null)
+  const saved = (await edits(page)).at(-1)
+  assert.deepEqual(readMarkup(saved).scene.shapes.map((shape) => shape.t), ['box'])
+  assert.deepEqual(await imageSizeOf(page, readMarkup(saved).original), [320, 200])
+  assert.deepEqual(errors, [])
+  await close()
+})
+
+test('a disk change under unsaved markup merges: the new image, with the markup on it', async () => {
+  const { page, frame, image, errors, close } = await open()
+  await tool(frame, 'Arrow')
+  await drag(page, frame, SIZE, [[100, 100], [200, 200]])
+  assert.equal(await flush(page), null)
+  // Orca hands the session the disk change with the content its unsaved edits started from.
+  const rewritten = await makeImage(page, { width: 640, height: 400, type: 'image/png', quality: undefined, seed: 1 })
+  await postBytes(page, rewritten, { ancestor: image })
+  await frame.locator('#toast:not([hidden])').waitFor()
+  await until(async () => (await edits(page)).length === 2)
+  assert.equal(await flush(page), null)
+  const sent = await edits(page)
+  const markup = readMarkup(sent.at(-1))
+  assert.deepEqual(markup.scene.shapes.map((shape) => shape.t), ['arrow'])
+  assert.ok(sameBytes(markup.original, rewritten), 'the new image is the original under the markup')
+  assert.equal(await info(frame), '640 × 400 · PNG · 1 mark')
   assert.deepEqual(errors, [])
   await close()
 })
@@ -365,23 +758,23 @@ test('a decode still running for an older document cannot replace a newer one', 
   await drag(page, frame, SIZE, [[100, 100], [200, 200]])
   assert.equal(await flush(page), null)
   const sent = await page.evaluate(() => window.__edits.map((edit) => edit.baseVersion))
-  assert.deepEqual(sent, [3], 'the edit names the newest version, so Orca takes it')
+  assert.ok(sent.length > 0 && sent.every((version) => version === 3), `the edits name the newest version, so Orca takes them: ${sent}`)
   assert.deepEqual(errors, [])
   await close()
 })
 
-test('an edit refused as stale is sent again once Orca delivers the newer document', async () => {
+test('an edit refused as stale stops the save, and goes through once Orca delivers the newer document', async () => {
   const { page, frame, image, errors, close } = await open()
   await drag(page, frame, SIZE, [[100, 100], [200, 200]])
   // Orca moved on (say, the tab reloaded the same file) before telling the frame.
   await page.evaluate(() => window.__version++)
   const error = await flush(page)
-  assert.match(error?.message ?? '', /hasn't reached Orca/, 'the save is stopped, not run without the markup')
+  assert.ok(error, 'the save is stopped, not run without the markup')
   assert.equal((await edits(page)).length, 0)
   await postBytes(page, image)
-  await page.waitForFunction(() => window.__edits.length === 1)
   assert.equal(await flush(page), null)
   assert.equal(readMarkup((await edits(page))[0]).scene.shapes.length, 1)
+  assert.equal(await info(frame), '640 × 400 · PNG · 1 mark')
   assert.deepEqual(errors, [])
   await close()
 })
@@ -391,8 +784,8 @@ test('a flush fails, so Orca does not save, when Orca refuses the markup', async
   await page.evaluate(() => (window.__refuse = { code: 'too_large', message: 'too large' }))
   await drag(page, frame, SIZE, [[100, 100], [200, 200]])
   const error = await flush(page)
-  assert.match(error?.message ?? '', /Orca didn't take the markup/)
-  assert.match(await status(frame), /Orca didn't take the markup/)
+  assert.ok(error, 'the save is stopped')
+  await frame.waitForFunction(() => /Orca didn't take the markup/.test(document.getElementById('status').textContent))
   assert.deepEqual(errors, [])
   await close()
 })

@@ -6,6 +6,8 @@ import { chromium } from 'playwright-core'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fitView, toStage } from '../src/view.js'
+import { ORCA_DOCUMENT_SCRIPT } from './orca-frame/document-script.mjs'
+import { readMarkup } from '../src/container.js'
 
 const HERE = import.meta.dirname
 export const EDITOR_HTML = readFileSync(path.resolve(HERE, '..', '..', 'editor', 'index.html'), 'utf8')
@@ -26,59 +28,83 @@ const TOKENS = {
   }
 }
 
-// The editor half of Orca's frame API; the real one is in Orca's plugin-panel-shell.ts.
-const ORCA_SHIM = `(function () {
-  var post = function (message) { window.parent.postMessage(Object.assign({ orca: 1 }, message), '*') }
+// The editor half of Orca's frame shell (plugin-panel-shell.ts): the envelope, `hello`, and the
+// real `orca.document` with `session()` from ./orca-frame/document-script.mjs. `files.saveAs` is
+// offered only when a test asks for it, as Orca offers it only to desktop frames.
+const ORCA_SHIM = (files) => `;(function (C) {
+  var E = C.events
+  var parent = window.parent
   var listeners = new Map()
   var pending = new Map()
   var nextId = 0
   var latest = null
+  var waiting = []
+  var helloSeen = false
+  var starting = []
+  function post(message) { parent.postMessage(Object.assign({ orca: 1 }, message), '*') }
   function on(name, fn) {
     var set = listeners.get(name) || new Set()
     listeners.set(name, set)
-    set.add(fn)
-    return { dispose: function () { set.delete(fn) } }
+    var entry = function (payload) { return fn(payload) }
+    set.add(entry)
+    return Object.freeze({ dispose: function () { set.delete(entry) } })
   }
   function emit(name, payload) {
-    return Array.from(listeners.get(name) || []).map(function (fn) { return Promise.resolve(fn(payload)) })
+    var set = listeners.get(name)
+    return set ? Array.from(set).map(function (fn) {
+      try { return Promise.resolve(fn(payload)) } catch (e) { return Promise.reject(e) }
+    }) : []
   }
-  window.orca = Object.freeze({
-    on: on,
-    document: Object.freeze({
-      onDidChange: function (fn) {
-        var subscription = on('editor.document', fn)
-        if (latest) Promise.resolve().then(function () { fn(latest) })
-        return subscription
-      },
-      applyEdit: function (edit) {
-        var id = nextId++
-        return new Promise(function (resolve, reject) {
-          pending.set(id, function (m) {
-            if (m.error) { var e = new Error(m.error.message); e.code = m.error.code; reject(e) } else resolve(null)
-          })
-          post({ kind: 'req', id: id, method: 'editor.applyEdit', params: edit })
-        })
-      }
+  function call(method, params) {
+    var id = nextId++
+    return new Promise(function (resolve, reject) {
+      pending.set(id, function (m) {
+        if (m.error) { var e = new Error(m.error.message); e.code = m.error.code; reject(e) } else resolve(m.result)
+      })
+      post({ kind: 'req', id: id, method: method, params: params })
     })
+  }
+  var orca = { on: on }
+  if (C.files) orca.files = Object.freeze({
+    saveAs: function (options) {
+      if (!navigator.userActivation.isActive) {
+        var e = new Error('files.saveAs needs a click or key press in the frame'); e.code = 'not_permitted'
+        return Promise.reject(e)
+      }
+      return call('files.saveAs', { suggestedName: options.suggestedName, mimeType: options.mimeType, data: options.data })
+    }
   })
+${ORCA_DOCUMENT_SCRIPT}
+  window.orca = Object.freeze(orca)
   window.addEventListener('message', function (event) {
     var m = event.data
-    if (event.source !== window.parent || !m || m.orca !== 1) return
+    if (event.source !== parent || !m || m.orca !== 1) return
     if (m.kind === 'res') { var settle = pending.get(m.id); if (settle) { pending.delete(m.id); settle(m) } }
-    else if (m.kind === 'evt' && m.event === 'editor.document') { latest = m.payload; emit('editor.document', m.payload) }
+    else if (m.kind === 'evt' && m.event === E.hello) { helloSeen = true; start() }
+    else if (m.kind === 'evt' && m.event === E.editorDocument) {
+      latest = Object.freeze(m.payload)
+      waiting.splice(0).forEach(function (resolve) { resolve(latest) })
+      start()
+      emit(E.editorDocument, latest)
+    }
     else if (m.kind === 'evt') emit(m.event, m.payload)
     else if (m.kind === 'req') Promise.all(emit(m.method, m.params)).then(function () { post({ kind: 'res', id: m.id, result: null }) }, function (e) { post({ kind: 'res', id: m.id, error: { code: 'action_failed', message: String(e && e.message || e) } }) })
   })
-  post({ kind: 'evt', event: 'ready', payload: { protocol: 1 } })
-})()`
+  post({ kind: 'evt', event: E.ready, payload: { protocol: 1 } })
+})(${JSON.stringify({
+  surface: 'editor',
+  files,
+  events: { ready: 'ready', hello: 'hello', editorDocument: 'editor.document', editorSubscribed: 'editor.subscribed', editorMerges: 'editor.merges' },
+  editor: { applyEdit: 'editor.applyEdit', flush: 'editor.flush' }
+})})`
 
-export function frameDocument(theme = 'light', html = EDITOR_HTML) {
+export function frameDocument(theme = 'light', html = EDITOR_HTML, { files = false } = {}) {
   const tokens = Object.entries(TOKENS[theme]).map(([name, value]) => `--orca-${name}:${value};`).join('')
   return (
     `<!doctype html>\n<html class="${theme}">\n<head>\n<meta charset="utf-8">\n` +
     `<meta http-equiv="Content-Security-Policy" content="${CSP}">\n` +
     `<style id="orca-design-tokens">:root{${tokens}}</style>\n` +
-    `<script>${ORCA_SHIM}</script>\n</head>\n${html}`
+    `<script>${ORCA_SHIM(files)}</script>\n</head>\n${html}`
   )
 }
 
@@ -89,12 +115,20 @@ window.__readyCount = 0
 window.__edits = []
 window.__version = 0
 window.__refuse = null
+window.__saved = []
 let nextFlush = 1000
 const flushes = new Map()
 window.addEventListener('message', (event) => {
   if (event.source !== frame()) return
   const m = event.data
-  if (m && m.event === 'ready') window.__readyCount++
+  if (m && m.event === 'ready') {
+    window.__readyCount++
+    frame().postMessage({ orca: 1, kind: 'evt', event: 'hello', payload: { protocol: 1, surface: 'editor', theme: { colorScheme: 'light', tokens: '' } } }, '*')
+  }
+  if (m && m.kind === 'req' && m.method === 'files.saveAs') {
+    window.__saved.push(new Uint8Array(m.params.data))
+    frame().postMessage({ orca: 1, kind: 'res', id: m.id, result: { status: 'saved' } }, '*')
+  }
   if (m && m.kind === 'req' && m.method === 'editor.applyEdit') {
     const { baseVersion, content } = m.params
     let error = window.__refuse
@@ -113,13 +147,11 @@ window.__toBase64 = (bytes) => {
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
   return btoa(binary)
 }
-window.__postBytes = (bytes, { fileType = 'png', readOnly = false, version = ++window.__version } = {}) => {
+window.__postBytes = (bytes, { fileType = 'png', readOnly = false, version = ++window.__version, ancestor } = {}) => {
   const copy = bytes.slice().buffer
-  frame().postMessage(
-    { orca: 1, kind: 'evt', event: 'editor.document', payload: { version, readOnly, fileType, content: { kind: 'bytes', bytes: copy } } },
-    '*',
-    [copy]
-  )
+  const payload = { version, readOnly, fileType, content: { kind: 'bytes', bytes: copy } }
+  if (ancestor) payload.ancestor = { kind: 'bytes', bytes: ancestor.slice().buffer }
+  frame().postMessage({ orca: 1, kind: 'evt', event: 'editor.document', payload }, '*')
 }
 window.__flush = () => new Promise((resolve) => {
   const id = nextFlush++
@@ -135,8 +167,11 @@ const ORIGIN = 'https://orca.test'
 export const toBase64 = (bytes) => Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64')
 export const fromBase64 = (base64) => new Uint8Array(Buffer.from(base64, 'base64'))
 /** Posts a document to the editor without waiting for it to show. */
-export const postBytes = (page, bytes, options = {}) =>
-  page.evaluate(([data, opts]) => window.__postBytes(window.__fromBase64(data), opts), [toBase64(bytes), options])
+export const postBytes = (page, bytes, { ancestor, ...options } = {}) =>
+  page.evaluate(
+    ([data, opts, base]) => window.__postBytes(window.__fromBase64(data), { ...opts, ancestor: base && window.__fromBase64(base) }),
+    [toBase64(bytes), options, ancestor && toBase64(ancestor)]
+  )
 
 export async function launch() {
   return chromium.launch({ headless: true })
@@ -146,7 +181,7 @@ export async function launch() {
  * Opens a fresh host page with the editor frame and waits for `ready`.
  * @returns {Promise<{ page: import('playwright-core').Page, frame: import('playwright-core').Frame, errors: Error[] }>}
  */
-export async function openEditor(browser, { theme = 'light', width = 1200, height = 800, deviceScaleFactor = 2, allowClipboard = false } = {}) {
+export async function openEditor(browser, { theme = 'light', width = 1200, height = 800, deviceScaleFactor = 2, allowClipboard = false, files = false } = {}) {
   const context = await browser.newContext({
     viewport: { width, height },
     deviceScaleFactor,
@@ -167,7 +202,7 @@ export async function openEditor(browser, { theme = 'light', width = 1200, heigh
       if (allow) frame.allow = 'clipboard-write'
       frame.srcdoc = srcdoc
     },
-    [frameDocument(theme), allowClipboard]
+    [frameDocument(theme, EDITOR_HTML, { files }), allowClipboard]
   )
   await page.waitForFunction(() => window.__readyCount > 0)
   const frame = page.frames().find((candidate) => candidate !== page.mainFrame())
@@ -182,29 +217,59 @@ export async function postImage(page, frame, bytes, options = {}) {
 }
 
 /** Makes a test image in the browser: a gradient with a few solid blocks, so pixels are checkable. */
-export async function makeImage(page, { width = 640, height = 400, type = 'image/png', quality } = {}) {
+export async function makeImage(page, { width = 640, height = 400, type = 'image/png', quality, seed = 0, label = '', orientation = 0 } = {}) {
   const data = await page.evaluate(
-    async ([w, h, t, q]) => {
+    async ([w, h, t, q, seed, label]) => {
       const canvas = new OffscreenCanvas(w, h)
       const ctx = canvas.getContext('2d')
       const gradient = ctx.createLinearGradient(0, 0, w, h)
-      gradient.addColorStop(0, '#203040')
+      gradient.addColorStop(0, seed ? '#402030' : '#203040')
       gradient.addColorStop(1, '#4080c0')
       ctx.fillStyle = gradient
       ctx.fillRect(0, 0, w, h)
       ctx.fillStyle = '#00ff00'
       ctx.fillRect(20, 20, 40, 40)
+      // Fine black and white stripes: detail a redaction must not keep.
+      for (let x = 300; x < 400; x += 4) {
+        ctx.fillStyle = (x / 4) % 2 ? '#000000' : '#ffffff'
+        ctx.fillRect(x, 300, 2, 60)
+      }
+      if (label) {
+        ctx.fillStyle = '#ffffff'
+        ctx.font = '600 28px monospace'
+        ctx.fillText(label, 110, 300)
+      }
       const blob = await canvas.convertToBlob(q === undefined ? { type: t } : { type: t, quality: q })
       return window.__toBase64(new Uint8Array(await blob.arrayBuffer()))
     },
-    [width, height, type, quality]
+    [width, height, type, quality, seed, label]
   )
-  return fromBase64(data)
+  const bytes = fromBase64(data)
+  return orientation ? withExifOrientation(bytes, orientation) : bytes
 }
 
-/** The edits Orca has received, as Uint8Arrays. */
-export async function edits(page) {
-  return (await page.evaluate(() => window.__edits.map((edit) => window.__toBase64(edit.bytes)))).map(fromBase64)
+/** A JPEG with an EXIF APP1 segment asking viewers to rotate it (6: 90° clockwise). */
+function withExifOrientation(jpeg, orientation) {
+  const tiff = Buffer.from([
+    0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08, // big-endian TIFF, first IFD at 8
+    0x00, 0x01, // one entry
+    0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, orientation, 0x00, 0x00, // Orientation, SHORT
+    0x00, 0x00, 0x00, 0x00 // no next IFD
+  ])
+  const body = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), tiff])
+  const segment = Buffer.concat([Buffer.from([0xff, 0xe1, (body.length + 2) >> 8, (body.length + 2) & 0xff]), body])
+  return new Uint8Array(Buffer.concat([jpeg.subarray(0, 2), segment, jpeg.subarray(2)]))
+}
+
+const PENDING_NOTE = Buffer.from('image-markup: an edit is still being encoded')
+/** Whether an edit is the stand-in that marks the tab unsaved while an encode runs. */
+export const isPending = (bytes) =>
+  Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).includes(PENDING_NOTE) || readMarkup(bytes)?.scene.redraw === true
+
+/** The encoded edits Orca has received, as Uint8Arrays; `{ pending: true }` includes the stand-ins. */
+export async function edits(page, { pending = false } = {}) {
+  const all = (await page.evaluate(() => window.__edits.map((edit) => window.__toBase64(edit.bytes)))).map(fromBase64)
+  return pending ? all : all.filter((bytes) => !isPending(bytes))
 }
 
 /** RGBA of image pixel (x, y) after decoding `bytes` in the browser. */
@@ -219,6 +284,14 @@ export async function pixel(page, bytes, x, y) {
     },
     [toBase64(bytes), x, y]
   )
+}
+
+/** [width, height] of `bytes` decoded in the browser. */
+export async function imageSizeOf(page, bytes) {
+  return page.evaluate(async (data) => {
+    const bitmap = await createImageBitmap(new Blob([window.__fromBase64(data)]))
+    return [bitmap.width, bitmap.height]
+  }, toBase64(bytes))
 }
 
 /** Page point over image pixel (x, y) while the image is fitted (the view until the user zooms). */

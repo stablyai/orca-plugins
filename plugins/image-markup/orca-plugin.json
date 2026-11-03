@@ -3,13 +3,13 @@
   "id": "orca-image-markup",
   "publisher": "stablyai",
   "name": "Image Markup",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "execution": "sandboxed-ui",
-  "description": "Mark up images in Orca with pen, arrow, box and text tools. Copy the result, or save it into the image with the original kept inside and the markup still editable.",
+  "description": "Mark up images in Orca: pen, highlighter, arrow, box, ellipse, text, numbered steps and redaction. Save the markup into the image with the original kept inside and still editable, or export a copy.",
   "license": "MIT",
   "repository": "https://github.com/stablyai/orca-plugins/tree/main/plugins/image-markup",
   "engines": {
-    "orca": ">=1.4.245"
+    "orca": ">=1.4.248"
   },
   "contributes": {
     "customEditors": [

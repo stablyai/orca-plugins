@@ -142,7 +142,7 @@ button:disabled {
   color: var(--muted-fg);
 }
 
-.primary {
+.action {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -150,9 +150,20 @@ button:disabled {
   padding: 0 10px;
   margin-left: 4px;
   border-radius: 6px;
+  font-weight: 500;
+}
+
+.action[hidden] {
+  display: none;
+}
+
+.action:not(.primary):not(:disabled):hover {
+  background: var(--accent);
+}
+
+.primary {
   background: var(--primary);
   color: var(--primary-fg);
-  font-weight: 500;
 }
 
 .primary:not(:disabled):hover {
