@@ -1,9 +1,10 @@
 // The image's document sync, on Orca's `orca.document.session()`: Orca keeps the buffer, dirty
 // state, saving and flushes; this file says how a file is read, written and merged.
 //
-// A value is { file, format, original, shapes, hadMarkup, size?, stale?, pending? }: `file` is the
+// A value is { file, format, original, shapes, hadMarkup, size?, stale?, pending?, redraw? }: `file` is the
 // whole file the value saves as, `original` the image under the markup, `shapes` the markup and
-// `size` the image's shown size. `pending` marks a stand-in sent before an encode finished. Encoding a scene
+// `size` the image's shown size. `pending` marks a stand-in sent before an encode finished, and
+// `redraw` a saved stand-in, whose pixels predate its shapes. Encoding a scene
 // into a file is asynchronous (the editor does it before `change`), so `encode` only hands over
 // `file`. A merge that moved markup onto a new image can't encode, so it returns `stale: true`
 // with the outside file; the editor encodes it and sends the result as its next change.
@@ -27,7 +28,8 @@ export function decodeImage(content) {
   const size = header && [header, [header[1], header[0]]].find(([w, h]) => w === markup.scene?.w && h === markup.scene?.h)
   const shapes = size && parseScene(markup.scene, size[0], size[1])
   if (!shapes) return plain
-  return { file, format, original: markup.original.slice(), shapes, hadMarkup: shapes.length > 0, size }
+  const redraw = markup.scene.redraw === true
+  return { file, format, original: markup.original.slice(), shapes, hadMarkup: shapes.length > 0, size, redraw }
 }
 
 const exactBuffer = (bytes) =>

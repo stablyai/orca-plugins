@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
 import { crc32, detectFormat, readMarkup, sameBytes, writeMarkup } from '../src/container.js'
-import { drag, edits, imageSizeOf, launch, makeImage, openEditor, pagePoint, pixel, postBytes, postImage } from './harness.mjs'
+import { drag, edits, imageSizeOf, isPending, launch, makeImage, openEditor, pagePoint, pixel, postBytes, postImage } from './harness.mjs'
 
 const SIZE = [640, 400]
 const RED = [255, 59, 48]
@@ -317,6 +317,62 @@ test('a stroke marks the tab unsaved at once, before its encode, so closing asks
   assert.deepEqual(errors, [])
   await close()
 })
+
+const holdEncodes = (frame) =>
+  frame.evaluate(() => {
+    const arrayBuffer = Blob.prototype.arrayBuffer
+    const held = new Promise((resolve) => (window.__release = resolve))
+    Blob.prototype.arrayBuffer = async function () {
+      await held
+      return arrayBuffer.call(this)
+    }
+  })
+
+for (const [format, imageOptions, post] of [
+  ['PNG', {}, {}],
+  ['JPEG', { type: 'image/jpeg', quality: 0.9 }, { fileType: 'jpg' }]
+]) {
+  test(`${format}: an undo back to the saved scene leaves Orca the real file, never the stand-in`, async () => {
+    const { page, frame, errors, close } = await open({ image: imageOptions, post })
+    await drag(page, frame, SIZE, [[100, 100], [200, 200]])
+    assert.equal(await flush(page), null)
+    const [real] = await edits(page)
+    await drag(page, frame, SIZE, [[300, 100], [400, 200]])
+    await until(async () => (await edits(page, { pending: true })).some(isPending))
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z')
+    assert.equal(await flush(page), null)
+    const last = (await edits(page, { pending: true })).at(-1)
+    assert.ok(!isPending(last) && sameBytes(last, real), 'what a save writes is the real file')
+    assert.deepEqual(errors, [])
+    await close()
+  })
+
+  test(`${format}: a stand-in saved before its encode (say, after a view switch) reopens with the markup`, async () => {
+    const { page, frame, image, errors, close } = await open({ image: imageOptions, post })
+    await holdEncodes(frame)
+    await tool(frame, 'Box')
+    await frame.getByRole('button', { name: 'Thick stroke', exact: true }).click()
+    await drag(page, frame, SIZE, [[100, 100], [300, 300]])
+    await until(async () => (await edits(page, { pending: true })).length === 1)
+    // The frame goes away with the encode still running: Orca saves what it holds.
+    const [standIn] = await edits(page, { pending: true })
+    await close()
+    const markup = readMarkup(standIn)
+    assert.ok(markup, 'the markup is still readable')
+    assert.ok(sameBytes(markup.original, image), 'and the original is still inside')
+    assert.deepEqual(markup.scene.shapes.map((shape) => shape.t), ['box'])
+    // Reopened, the shapes are there, and the stale pixels are redrawn as an unsaved edit.
+    const reopened = await openEditor(browser)
+    await postImage(reopened.page, reopened.frame, standIn, post)
+    assert.equal(await info(reopened.frame), `640 × 400 · ${format} · 1 mark`)
+    await until(async () => (await edits(reopened.page)).length === 1)
+    const redrawn = (await edits(reopened.page))[0]
+    assert.ok(near(await pixel(reopened.page, redrawn, 100, 200), RED, 40), 'the box is in the pixels now')
+    assert.ok(sameBytes(readMarkup(redrawn).original, image))
+    assert.deepEqual([...errors, ...reopened.errors], [])
+    await reopened.close()
+  })
+}
 
 test('markup merged onto a new image during an encode is still sent', async () => {
   const { page, frame, errors, close } = await open()

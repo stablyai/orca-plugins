@@ -13,6 +13,8 @@
 const PAYLOAD_VERSION = 1
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
 const PNG_CHUNK = 'orCA'
+// A stand-in's note (see withPendingMark); never written into a real save.
+const PENDING_CHUNK = 'orCp'
 const JPEG_MARKER = 0xe9 // APP9
 const JPEG_SIGNATURE = 'ORCA-MARKUP\0'
 // Segment length is a u16 that counts itself: 65535 - 2 (length) - 12 (signature) - 4 (index, count).
@@ -136,7 +138,7 @@ function writePngMarkup(flattened, original, scene) {
   const chunks = pngChunks(flattened)
   if (!chunks) throw new Error('the encoder returned an unreadable PNG')
   const payload = encodePayload(pngPixelCrc(flattened, chunks), scene, original)
-  const kept = chunks.filter((chunk) => chunk.type !== PNG_CHUNK)
+  const kept = chunks.filter((chunk) => chunk.type !== PNG_CHUNK && chunk.type !== PENDING_CHUNK)
   // The original's pixel density (pHYs): without it a Retina screenshot shows at twice its size
   // in Preview and Keynote. Colour chunks are not copied; the flattened pixels are sRGB.
   const density = chunks.some((chunk) => chunk.type === 'pHYs')
@@ -202,6 +204,12 @@ const isOurSegment = (bytes, segment) =>
   segment.end - segment.start >= JPEG_HEADER &&
   startsWith(bytes, segment.start + 4, JPEG_SIGNATURE_BYTES)
 
+const PENDING_SIGNATURE = ascii('ORCA-PENDING\0')
+/** Our segments, and the note an unsaved stand-in carries: neither counts toward the pixel CRC. */
+const isSkippedSegment = (bytes, segment) =>
+  isOurSegment(bytes, segment) ||
+  (segment.marker === JPEG_MARKER && startsWith(bytes, segment.start + 4, PENDING_SIGNATURE))
+
 function readJpegMarkup(bytes) {
   const parsed = jpegSegments(bytes)
   if (!parsed) return null
@@ -226,7 +234,7 @@ function readJpegMarkup(bytes) {
   // The pixel CRC covers the encoder's file, which is this file minus our segments.
   let crc = 0
   let from = 0
-  for (const segment of ours) {
+  for (const segment of parsed.segments.filter((candidate) => isSkippedSegment(bytes, candidate))) {
     crc = crc32(bytes, from, segment.start, crc)
     from = segment.end
   }
@@ -235,7 +243,7 @@ function readJpegMarkup(bytes) {
 }
 
 function withoutOurSegments(bytes, segments) {
-  const ours = segments.filter((segment) => isOurSegment(bytes, segment))
+  const ours = segments.filter((segment) => isSkippedSegment(bytes, segment))
   if (ours.length === 0) return bytes
   const out = new Uint8Array(bytes.length - ours.reduce((sum, segment) => sum + segment.end - segment.start, 0))
   let at = 0
@@ -367,7 +375,7 @@ export function withPendingMark(format, bytes) {
     out.set(bytes.subarray(0, end.start), 0)
     let at = end.start
     writeU32(out, at, PENDING_NOTE.length)
-    out.set(ascii('orCp'), at + 4)
+    out.set(ascii(PENDING_CHUNK), at + 4)
     out.set(PENDING_NOTE, at + 8)
     writeU32(out, at + 8 + PENDING_NOTE.length, crc32(out, at + 4, at + 8 + PENDING_NOTE.length))
     at += 12 + PENDING_NOTE.length
@@ -375,14 +383,20 @@ export function withPendingMark(format, bytes) {
     return out
   }
   if (format === 'jpeg') {
-    if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return null
-    const out = new Uint8Array(bytes.length + 4 + PENDING_NOTE.length)
-    out.set(bytes.subarray(0, 2), 0)
-    out[2] = 0xff
-    out[3] = 0xfe
-    writeU16(out, 4, 2 + PENDING_NOTE.length)
-    out.set(PENDING_NOTE, 6)
-    out.set(bytes.subarray(2), 6 + PENDING_NOTE.length)
+    const parsed = jpegSegments(bytes)
+    if (!parsed) return null
+    // After APP0 when present (JFIF wants it first), in an APP9 segment the pixel CRC skips.
+    const first = parsed.segments[0]
+    const at = first && first.marker === 0xe0 ? first.end : 2
+    const length = 2 + PENDING_SIGNATURE.length + PENDING_NOTE.length
+    const out = new Uint8Array(bytes.length + 2 + length)
+    out.set(bytes.subarray(0, at), 0)
+    out[at] = 0xff
+    out[at + 1] = JPEG_MARKER
+    writeU16(out, at + 2, length)
+    out.set(PENDING_SIGNATURE, at + 4)
+    out.set(PENDING_NOTE, at + 4 + PENDING_SIGNATURE.length)
+    out.set(bytes.subarray(at), at + 2 + length)
     return out
   }
   return null

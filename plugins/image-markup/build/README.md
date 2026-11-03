@@ -69,9 +69,13 @@ drawing, panning and zooming hold 60 fps in headless software rendering.
 - Redactions, and every shape drawn before the last one, are rendered into the original before
   it is stored and left out of the stored scene, so nothing they cover survives as pixels or as
   text. With nothing else to keep, the file is just the flattened image.
-- Orca flushes editors before a save, not before closing or reloading a tab, and an encode can
-  take seconds. So the first edit after each handover sends the last file with a note added (a
-  private `orCp` PNG chunk or a JPEG comment): the tab is unsaved at once and closing it asks.
+- Orca flushes editors before a save, but not before closing, reloading or switching a tab's
+  view, and an encode can take seconds. So the first edit after each handover sends a stand-in at
+  once and the tab is unsaved. The stand-in is the last file with the latest shapes written into
+  its markup (scene marked `redraw`), so if it is saved anyway it reopens with every shape and is
+  encoded again. With a redaction in the scene it is instead the last file with a note (a private
+  `orCp` PNG chunk, or an APP9 `ORCA-PENDING` segment the JPEG pixel CRC skips). A real file
+  always follows: the encode, or the last one again after an undo back to it.
 - `orca.files.saveAs` (desktop only, needs the click's activation) is Export. The render is kept,
   so when a large image outlasts the click, the second click saves at once.
 

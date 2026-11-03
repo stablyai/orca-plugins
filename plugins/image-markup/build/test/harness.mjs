@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fitView, toStage } from '../src/view.js'
 import { ORCA_DOCUMENT_SCRIPT } from './orca-frame/document-script.mjs'
+import { readMarkup } from '../src/container.js'
 
 const HERE = import.meta.dirname
 export const EDITOR_HTML = readFileSync(path.resolve(HERE, '..', '..', 'editor', 'index.html'), 'utf8')
@@ -262,7 +263,8 @@ function withExifOrientation(jpeg, orientation) {
 
 const PENDING_NOTE = Buffer.from('image-markup: an edit is still being encoded')
 /** Whether an edit is the stand-in that marks the tab unsaved while an encode runs. */
-export const isPending = (bytes) => Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).includes(PENDING_NOTE)
+export const isPending = (bytes) =>
+  Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).includes(PENDING_NOTE) || readMarkup(bytes)?.scene.redraw === true
 
 /** The encoded edits Orca has received, as Uint8Arrays; `{ pending: true }` includes the stand-ins. */
 export async function edits(page, { pending = false } = {}) {

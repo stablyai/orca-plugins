@@ -94,6 +94,7 @@ const s = {
   readOnly: true,
   format: null,
   marked: undefined, // `posted` when the tab was last marked unsaved ahead of an encode
+  standIn: false, // the session holds a stand-in, not a real encode
   savable: false,
   original: null, // the image's own bytes: the file, or the original kept inside saved markup
   hadMarkup: false,
@@ -469,16 +470,37 @@ function scheduleCommit() {
 }
 
 /**
- * Orca flushes an editor before a save, not before closing or reloading its tab, and the encode can
- * take seconds. So the first edit after each handover sends the last file with a note added: the
- * tab reads as unsaved at once, and closing it asks first. A save waits for the real encode.
+ * Orca flushes an editor before a save, but not before closing, reloading or switching its view,
+ * and an encode can take seconds. So the first edit after each handover sends a stand-in at once:
+ * the tab reads as unsaved, and closing asks first. The stand-in is always followed by the real
+ * file (or by the last one again, after an undo back to it). If one is saved anyway, it is still
+ * a valid file: the last image with the latest shapes inside, marked to be redrawn on reopen.
  */
 function markPending() {
   if (!s.base || s.marked === s.posted || s.shapes === s.posted) return
-  const file = withPendingMark(s.format, s.base.file)
+  const file = standInFile(s.shapes)
   if (!file) return
   s.marked = s.posted
+  s.standIn = true
   doc.change({ ...s.base, shapes: s.shapes, file, pending: true })
+}
+
+/** The last file with `shapes` inside it, or with just a note when they hold a redaction. */
+function standInFile(shapes) {
+  // The original goes in only where a real save would put it too: never under a redaction.
+  if (shapes.length && !shapes.some((shape) => shape.t === 'redact')) {
+    const scene = { ...serializeScene(shapes, s.width, s.height), redraw: true }
+    const file = writeMarkup(s.format, s.base.file, s.original, scene)
+    if (file.byteLength <= MAX_DOCUMENT_BYTES) return file
+  }
+  return withPendingMark(s.format, s.base.file)
+}
+
+/** After an undo back to the last handed-over scene, a stand-in must not stay Orca's value. */
+function settleStandIn() {
+  if (!s.standIn || s.shapes !== s.posted || !canSave()) return
+  s.standIn = false
+  doc.change(s.base)
 }
 
 /** Encodes the latest scene and hands it to the session; resolves once the session has it. */
@@ -512,10 +534,12 @@ async function commitLoop() {
       return
     }
     doc.change(value)
+    s.standIn = false
     s.posted = shapes
     s.base = value
     s.saveError = null
   }
+  settleStandIn()
 }
 
 /** Orca awaits this, with the session's own flush, before it saves. */
@@ -749,6 +773,8 @@ async function load(value, { outside = false } = {}) {
 
   const sameSize = s.bitmap && s.width === bitmap.width && s.height === bitmap.height
   const keptMarkup = value.stale === true
+  // A saved stand-in: its shapes are right but its pixels are not, so encode it again.
+  const redraw = !keptMarkup && value.redraw === true && shapes.length > 0
   s.bitmap?.close()
   for (const mip of s.mips) if (mip instanceof ImageBitmap) mip.close()
   const base = keptMarkup ? { ...value, shapes: [] } : value
@@ -765,7 +791,10 @@ async function load(value, { outside = false } = {}) {
     shapes,
     loaded: keptMarkup ? [] : shapes,
     // A merge still has to be encoded and sent, so it doesn't count as posted.
-    posted: keptMarkup ? null : shapes,
+    posted: keptMarkup || redraw ? null : shapes,
+    // A redraw needs no stand-in: the file already holds these shapes.
+    marked: redraw ? null : undefined,
+    standIn: false,
     base,
     past: [],
     future: [],
@@ -786,7 +815,7 @@ async function load(value, { outside = false } = {}) {
   if (keptMarkup) {
     toast('The image changed outside this editor. Your markup is kept on top of the new version.', 6000)
     scheduleCommit()
-  }
+  } else if (redraw) scheduleCommit()
 }
 
 // ---- pointer interaction ----
