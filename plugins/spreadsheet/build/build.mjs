@@ -44,24 +44,28 @@ const html = `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>Spreadsheet Viewer</title>
+<title>Spreadsheet</title>
 <style>${css}</style>
 </head>
 <body>
 <div class="app">
 <div class="message" id="message" role="status"></div>
 <div class="workbook" id="workbook" hidden>
+<div class="notice" id="notice" role="note" hidden></div>
+<div class="notice conflict" id="conflict" role="alert" hidden><span id="conflict-text"></span><button type="button" class="notice-button" id="conflict-apply">Reapply at the same cells</button><button type="button" class="notice-button" id="conflict-discard">Discard them</button></div>
 <div class="detail-bar">
 <div class="address" id="address" title="Active cell"></div>
-<div class="detail" id="detail" aria-label="Cell contents"><span class="detail-formula" id="detail-formula"></span><span class="detail-value" id="detail-value"></span><span class="detail-raw" id="detail-raw"></span></div>
+<input class="formula" id="formula" type="text" spellcheck="false" autocomplete="off" aria-label="Cell contents">
+<span class="result" id="result"></span>
 </div>
-<div class="sheet-area"><div class="grid-host" id="grid-host"></div><div class="sheet-message" id="sheet-message" hidden></div></div>
+<div class="sheet-area"><div class="grid-host" id="grid-host"></div><textarea class="cell-editor" id="cell-editor" spellcheck="false" aria-label="Edit cell" hidden></textarea><div class="sheet-message" id="sheet-message" hidden></div></div>
 <div class="footer">
 <div class="tabs" id="tabs" role="tablist" aria-label="Sheets"></div>
 <span class="hidden-note" id="hidden-note" hidden></span>
 <div class="status"><span class="status-note" id="status-note"></span><span id="status-stats"></span><span class="status-dims" id="status-dims"></span></div>
 </div>
 </div>
+<div class="menu" id="menu" role="menu" aria-label="Cell actions" hidden></div>
 <div class="sr-only" id="live" aria-live="polite"></div>
 </div>
 <script>${js}</script>
@@ -94,7 +98,7 @@ const sections = [...packages.values()]
   .map((pkg) => `${pkg.name}@${pkg.version} (${pkg.license})\n${pkg.homepage ?? ''}\n\n${licenceText(pkg)}`)
 writeFileSync(
   NOTICES,
-  `Spreadsheet Viewer's editor/index.html bundles the following software.\n\n` +
+  `Spreadsheet's editor/index.html bundles the following software.\n\n` +
     `${sections.join(`\n\n${'='.repeat(78)}\n\n`)}\n`
 )
 

@@ -18,8 +18,11 @@ const EDGE_SCROLL_MARGIN = 24
 
 /**
  * @param {HTMLElement} host
- * @param {{ label: string, measureText: (text: string) => number, onSelectionChange: () => void,
- *   onSwitchSheet: (delta: number) => void }} options
+ * @param {{ measureText: (text: string) => number, onSelectionChange: () => void,
+ *   onSwitchSheet: (delta: number) => void, editable: () => boolean,
+ *   onStartEdit: (text: string | null) => void, onClear: () => void,
+ *   onContextMenu: (x: number, y: number) => void }} options
+ *   `onStartEdit(null)` edits the cell's content; a string replaces it as typing does.
  */
 export function createGridView(host, options) {
   host.innerHTML = `
@@ -48,6 +51,7 @@ export function createGridView(host, options) {
   const idPrefix = `g${Math.random().toString(36).slice(2, 8)}`
 
   let sheet = null
+  let widths = new Float64Array(0)
   let rows = createAxis([])
   let columns = createAxis([])
   let merges = createMergeIndex([])
@@ -64,6 +68,8 @@ export function createGridView(host, options) {
   const context = () => ({
     rowCount: rows.count,
     columnCount: columns.count,
+    usedRows: sheet.rowCount,
+    usedColumns: sheet.columnCount,
     pageRows: Math.max(1, rows.indexAt(scrollY + height - HEADER_HEIGHT) - rows.indexAt(scrollY)),
     isEmpty: (r, c) => isEmptyCell(getCell(sheet, r, c)),
     merges,
@@ -71,14 +77,24 @@ export function createGridView(host, options) {
     isColumnHidden: columns.isHidden
   })
 
-  function setSheet(next, state = {}) {
+  /**
+   * Shows a sheet. `extent` sizes the grid past the used cells, so an editable sheet has room to
+   * type into; `keepWidths` keeps the columns as wide as they were (after an edit to a cell).
+   */
+  function setSheet(next, state = {}, extent = {}) {
+    const previousWidths = state.keepWidths && sheet === next ? widths : null
     sheet = next
-    rows = createAxis(computeRowHeights(sheet))
-    columns = createAxis(computeColumnWidths(sheet, options.measureText))
+    const rowCount = extent.rows ?? sheet.rowCount
+    const columnCount = extent.columns ?? sheet.columnCount
+    rows = createAxis(computeRowHeights(sheet, rowCount))
+    widths = computeColumnWidths(sheet, options.measureText, columnCount)
+    if (previousWidths) widths.set(previousWidths.subarray(0, Math.min(previousWidths.length, widths.length)))
+    columns = createAxis(widths)
     merges = createMergeIndex(sheet.merges)
-    gutter = Math.ceil(options.measureText(String(Math.max(1, sheet.rowCount))) + 20)
+    gutter = Math.ceil(options.measureText(String(Math.max(1, rowCount))) + 20)
     selection = state.selection ?? cellSelection(0, 0)
     viewport.setAttribute('aria-label', next.name)
+    viewport.setAttribute('aria-readonly', String(!options.editable()))
     viewport.setAttribute('aria-rowcount', String(rows.count + 1))
     viewport.setAttribute('aria-colcount', String(columns.count + 1))
     viewport.style.setProperty('--gutter', `${gutter}px`)
@@ -276,6 +292,31 @@ export function createGridView(host, options) {
     if (!sheet || rows.count === 0) return
     const primary = event.ctrlKey || event.metaKey
     const extend = event.shiftKey
+    if ((event.key === 'F10' && extend && !primary) || event.key === 'ContextMenu') {
+      event.preventDefault()
+      const box = cellBox(selection.active.r, selection.active.c)
+      const bounds = viewport.getBoundingClientRect()
+      options.onContextMenu(bounds.left + box.left + Math.min(box.width, 40), bounds.top + box.top + box.height)
+      return
+    }
+    if (options.editable() && !primary && !event.altKey) {
+      if (event.key === 'F2') {
+        event.preventDefault()
+        options.onStartEdit(null)
+        return
+      }
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault()
+        options.onClear()
+        return
+      }
+      // Why no preventDefault: the editor takes focus now, so the key (or an IME's first
+      // composition) lands in it as typing would.
+      if ((event.key.length === 1 && event.key !== ' ') || event.key === 'Process' || (event.key === ' ' && !extend)) {
+        options.onStartEdit('')
+        return
+      }
+    }
     const arrows = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
     let action = null
     if (event.key in arrows) {
@@ -334,10 +375,29 @@ export function createGridView(host, options) {
   }
 
   function onPointerDown(event) {
+    if (event.button === 2 && sheet && rows.count > 0) {
+      // A right click inside the selection keeps it, so the menu acts on all of it.
+      const hit = hitTest(event.clientX, event.clientY)
+      const range = selectionRange(selection, merges)
+      const inside = hit.r >= range.r0 && hit.r <= range.r1 && hit.c >= range.c0 && hit.c <= range.c1
+      const zoneInside = (hit.zone === 'row' && inside) || (hit.zone === 'column' && inside) || (hit.zone === 'cell' && inside) || hit.zone === 'corner'
+      viewport.focus({ preventScroll: true })
+      if (!zoneInside) {
+        if (hit.zone === 'row') dispatch({ type: 'row', r: hit.r }, false)
+        else if (hit.zone === 'column') dispatch({ type: 'column', c: hit.c }, false)
+        else dispatch({ type: 'cell', r: hit.r, c: hit.c })
+      }
+      return
+    }
     if (event.button !== 0 || !sheet || rows.count === 0 || columns.count === 0) return
     const hit = hitTest(event.clientX, event.clientY)
     event.preventDefault()
     viewport.focus({ preventScroll: true })
+    if (event.detail === 2 && hit.zone === 'cell' && options.editable()) {
+      dispatch({ type: 'cell', r: hit.r, c: hit.c })
+      options.onStartEdit(null)
+      return
+    }
     if (hit.zone === 'corner') return dispatch({ type: 'all' }, false)
     drag = { zone: hit.zone, x: event.clientX, y: event.clientY }
     viewport.setPointerCapture(event.pointerId)
@@ -396,6 +456,17 @@ export function createGridView(host, options) {
     if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId)
   }
 
+  /** Where a cell (or the merge it starts) is drawn, in the viewport's pixels. */
+  function cellBox(r, c) {
+    const rect = cellRect(r, c)
+    return { left: gutter + rect.x - scrollX, top: HEADER_HEIGHT + rect.y - scrollY, width: rect.x1 - rect.x, height: rect.y1 - rect.y }
+  }
+
+  function onContextMenu(event) {
+    event.preventDefault()
+    if (sheet && rows.count > 0) options.onContextMenu(event.clientX, event.clientY)
+  }
+
   const resizeObserver = new ResizeObserver(() => {
     measure()
     rendered = null
@@ -408,11 +479,25 @@ export function createGridView(host, options) {
   viewport.addEventListener('pointermove', onPointerMove)
   viewport.addEventListener('pointerup', endDrag)
   viewport.addEventListener('pointercancel', endDrag)
+  viewport.addEventListener('contextmenu', onContextMenu)
+  scroller.addEventListener('scroll', () => options.onScroll?.(), { passive: true })
 
   return {
     element: viewport,
     setSheet,
     dispatch,
+    cellBox,
+    refresh: () => {
+      rendered = null
+      render()
+    },
+    scrollIntoView,
+    get rowCount() {
+      return rows.count
+    },
+    get columnCount() {
+      return columns.count
+    },
     focus: () => viewport.focus({ preventScroll: true }),
     get selection() {
       return selection

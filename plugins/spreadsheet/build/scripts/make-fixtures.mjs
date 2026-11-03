@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { styledOds, styledWorkbook } from './styled-fixture.mjs'
 
 export const DEFAULT_FIXTURE_DIR = process.env.SPREADSHEET_FIXTURES ?? '/private/tmp/xlsx-fixtures'
 export const DATA_ROWS = 50_000
@@ -138,6 +139,9 @@ export function makeFixtures(dir = DEFAULT_FIXTURE_DIR) {
   write('corrupt.xlsx', Buffer.concat([large.subarray(0, 2048), Buffer.from('not the rest of the file')]))
   write('garbage.xlsx', Buffer.from('this is plain text, not a workbook\n1,2,3\n'))
   write('encrypted.xlsx', encryptedWorkbook())
+  write('styled.xlsx', styledWorkbook())
+  write('styled.xlsm', styledWorkbook({ macro: true }))
+  write('styled.ods', styledOds())
   return dir
 }
 
