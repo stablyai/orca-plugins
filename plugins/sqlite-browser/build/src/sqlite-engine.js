@@ -352,15 +352,20 @@ export class SqliteEngine {
   cell(id, index, column, maxChars = Infinity, maxBytes = Infinity) {
     const result = this.result(id)
     const expr = result.exprs[column]
-    const cut = (limit) => (Number.isFinite(limit) ? `substr(${expr}, 1, ${Math.floor(limit)})` : expr)
-    const project = `typeof(${expr}), CASE typeof(${expr}) WHEN 'text' THEN ${cut(maxChars)} WHEN 'blob' THEN ${cut(maxBytes)} ELSE ${expr} END, length(${expr})`
+    const limit = (max) => (Number.isFinite(max) ? Math.floor(max) : -1)
+    const [chars, bytes] = [limit(maxChars), limit(maxBytes)]
+    const cut = (max) => (max >= 0 ? `substr(${expr}, 1, ${max})` : expr)
+    // Why SQL decides the cut: length() counts characters, while a JS string counts UTF-16 units.
+    const project =
+      `typeof(${expr}), CASE typeof(${expr}) WHEN 'text' THEN ${cut(chars)} WHEN 'blob' THEN ${cut(bytes)} ELSE ${expr} END, length(${expr}), ` +
+      `CASE typeof(${expr}) WHEN 'text' THEN ${chars} >= 0 AND length(${expr}) > ${chars} WHEN 'blob' THEN ${bytes} >= 0 AND length(${expr}) > ${bytes} ELSE 0 END`
     const [sql, params] = this.window(result, project, index, 1)
     const row = this.all(sql, params)[0]
     if (!row) return { t: 'null', v: null }
     const cell = cellOf(row[1], row[2])
     if (cell.t === 'text' || cell.t === 'blob') {
       cell.length = toNumber(row[3])
-      cell.truncated = cell.v.length < cell.length
+      cell.truncated = toNumber(row[4]) === 1
     }
     return cell
   }

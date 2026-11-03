@@ -216,3 +216,21 @@ test('the detail pane gets a capped preview of a huge cell, with its whole lengt
   assert.throws(() => engine.copy(result.id, 0, 1, [1], false, 100000), /too much/)
   engine.close()
 })
+
+test('a cut preview of emoji text is marked cut, though JS counts each emoji twice', () => {
+  const engine = new SqliteEngine(SQL, fileOf(`CREATE TABLE e (t TEXT); INSERT INTO e VALUES ('${'😀'.repeat(250)}'), ('${'😀'.repeat(150)}');`))
+  const result = engine.openObject('e')
+  const cut = engine.cell(result.id, 0, 0, 200, 4096)
+  assert.deepEqual([cut.length, cut.truncated], [250, true])
+  assert.equal([...cut.v].length, 200)
+  const whole = engine.cell(result.id, 1, 0, 200, 4096)
+  assert.deepEqual([whole.length, whole.truncated], [150, false])
+  engine.close()
+})
+
+test('integer filters past the int64 range compare as numbers instead of clamping', () => {
+  const engine = new SqliteEngine(SQL, fileOf('CREATE TABLE m (id INTEGER); INSERT INTO m VALUES (9223372036854775807);'))
+  assert.equal(engine.openObject('m', { filters: { 0: '=99999999999999999999' } }).count, 0)
+  assert.equal(engine.openObject('m', { filters: { 0: '<99999999999999999999' } }).count, 1)
+  engine.close()
+})

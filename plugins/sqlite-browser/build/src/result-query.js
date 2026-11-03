@@ -5,6 +5,8 @@
 export const quoteId = (name) => `"${String(name).replaceAll('"', '""')}"`
 
 const NUMBER = /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i
+const INT64_MIN = -(2n ** 63n)
+const INT64_MAX = 2n ** 63n - 1n
 const COMPARISON = /^(>=|<=|!=|<>|=|>|<)\s*(.*)$/s
 
 /**
@@ -30,7 +32,9 @@ export function parseFilter(input) {
     const raw = comparison[2]
     if (!NUMBER.test(raw)) return { op, value: raw }
     // Why text: Number() rounds integers past 2^53, such as 64-bit ids, so they would never match.
-    const bigInteger = /^[-+]?\d+$/.test(raw) && !Number.isSafeInteger(Number(raw))
+    // Past int64, CAST would clamp to its limit, so those compare as the (exact enough) real.
+    const bigInteger =
+      /^[-+]?\d+$/.test(raw) && !Number.isSafeInteger(Number(raw)) && BigInt(raw) >= INT64_MIN && BigInt(raw) <= INT64_MAX
     return { op, value: bigInteger ? raw : Number(raw), text: raw, integer: bigInteger }
   }
   return { op: 'contains', value: text }
