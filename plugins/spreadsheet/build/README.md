@@ -120,8 +120,10 @@ remembers what it encoded, so decoding Orca's copy of an accepted edit gives tha
 instead of parsing the file again. `merge(base, outside, mine)` replays this tab's cell edits since
 `base` onto `outside` only when that is clearly safe: no row or column change on this side, and on
 the outside no sheet changed, no sheet changed its used size or merges, and no row or column this
-tab edited changed. Otherwise it returns `outside` with the edits in `rejected`, and the editor
-offers to reapply them at the same cells or discard them.
+tab edited changed. Otherwise it returns `outside` with the edits in `rejected`. The editor holds
+them (across later outside writes too) and offers to reapply the cell edits at the same addresses,
+each through the checks a typed edit gets, or discard them. Row and column changes are listed, never
+reapplied. A typed formula whose inputs changed outside also refuses the merge.
 
 The editor commits an open cell edit on `editor.flush` (registered before the session's handler),
 on the save shortcut and on `pagehide`, so a save includes what is being typed.

@@ -2,36 +2,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import * as XLSX from 'xlsx'
-import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
+import { strFromU8, unzipSync } from 'fflate'
 import { styledOds } from '../scripts/styled-fixture.mjs'
 import { cellFromInput } from '../src/cell-input.js'
 import { createSource, mergeWorkbooks, modelOf, shiftBlocker, touchesLockedCell, writeWorkbook } from '../src/workbook-document.js'
 import { applyOp } from '../src/workbook-edits.js'
 import { findSheet } from '../src/workbook-model.js'
 
-const MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
-const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
-const PKG = 'http://schemas.openxmlformats.org/package/2006/relationships'
+import { row, str, num, workbook, REL, MAIN } from './xlsx-fixture.mjs'
 
-/** A workbook from sheet XML bodies: `{ name, data, rels?, ext? }`, plus any extra parts. */
-function workbook(sheets, extra = {}) {
-  const files = {
-    '[Content_Types].xml': `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>`,
-    '_rels/.rels': `<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
-    'xl/workbook.xml': `<workbook xmlns="${MAIN}" xmlns:r="${REL}"><sheets>${sheets.map((sheet, i) => `<sheet name="${sheet.name}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`,
-    'xl/_rels/workbook.xml.rels': `<Relationships xmlns="${PKG}">${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="${REL}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}</Relationships>`,
-    ...extra
-  }
-  sheets.forEach((sheet, i) => {
-    files[`xl/worksheets/sheet${i + 1}.xml`] = `<worksheet xmlns="${MAIN}" xmlns:r="${REL}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><sheetData>${sheet.data}</sheetData>${sheet.after ?? ''}</worksheet>`
-    if (sheet.rels) files[`xl/worksheets/_rels/sheet${i + 1}.xml.rels`] = `<Relationships xmlns="${PKG}">${sheet.rels}</Relationships>`
-  })
-  return zipSync(Object.fromEntries(Object.entries(files).map(([name, text]) => [name, strToU8(text)])))
-}
-
-const row = (r, cells) => `<row r="${r}">${cells}</row>`
-const str = (ref, text) => `<c r="${ref}" t="inlineStr"><is><t>${text}</t></is></c>`
-const num = (ref, value) => `<c r="${ref}"><v>${value}</v></c>`
 const people = (rows) => workbook([{ name: 'Sheet1', data: rows.map(([name, amount], i) => row(i + 1, str(`A${i + 1}`, name) + (amount === undefined ? '' : num(`B${i + 1}`, amount)))).join('') }])
 
 function value(bytes) {
@@ -168,4 +147,25 @@ test('P3: an internal hyperlink follows the row it points at', () => {
   const target = value(workbook([{ name: 'Sheet1', data: row(1, str('A1', 'go')) + row(4, num('A4', 1)), after: links }]))
   edit(target, { type: 'shift', sheet: 'Sheet1', axis: 'row', at: 1, count: 1 })
   assert.match(sheetXml(writeWorkbook(target)), /<hyperlink ref="A1" location="Sheet1!A5" display="go"\/>/)
+})
+
+test('re-review P3: a row insert keeps the saved result of formulas it cannot calculate', () => {
+  const data = row(1, num('A1', 1) + `<c r="B1"><f>_xlfn.XLOOKUP(1,A1:A3,A1:A3)</f><v>1</v></c>`) + row(3, num('A3', 3))
+  const target = value(workbook([{ name: 'Sheet1', data }]))
+  edit(target, { type: 'shift', sheet: 'Sheet1', axis: 'row', at: 1, count: 1 })
+  assert.match(sheetXml(writeWorkbook(target)), /<c r="B1"><f>_xlfn\.XLOOKUP\(1,A1:A4,A1:A4\)<\/f><v>1<\/v><\/c>/)
+  // Deleting a row with data does change its inputs, so the result is dropped for Excel to redo.
+  edit(target, { type: 'shift', sheet: 'Sheet1', axis: 'row', at: 3, count: -1 })
+  assert.match(sheetXml(writeWorkbook(target)), /<c r="B1"><f>_xlfn\.XLOOKUP\(1,A1:A3,A1:A3\)<\/f><\/c>/)
+})
+
+test('re-review P3: a merge is refused when a formula this tab typed reads cells that moved', () => {
+  const rowsOf = (values) => workbook([{ name: 'Sheet1', data: values.map((v, i) => row(i + 1, num(`A${i + 1}`, v))).join('') }])
+  const original = rowsOf([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+  const base = value(original)
+  const mine = value(original)
+  typed(mine, 'Sheet1', 'B1', '=A10')
+  // Outside: a row inserted at 5 and the last dropped, so the size is the same and row 1 untouched.
+  const outside = value(rowsOf([1, 2, 3, 4, 0, 5, 6, 7, 8, 9]))
+  assert.equal(mergeWorkbooks(base, outside, mine).rejected.length, 1)
 })

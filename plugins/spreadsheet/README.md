@@ -25,8 +25,11 @@ Orca keeps the file: edits mark the tab unsaved and Orca's save writes them. Whe
 another app changes the file while you have unsaved edits, they are merged only when that is
 clearly safe: the outside change left every sheet's size and merged cells alone and touched no row
 or column you edited, and you only changed cell contents. Otherwise the tab shows the new file and
-sets your edits aside, with a choice to reapply them at the same cells or discard them, so nothing
-lands on rows that moved underneath it.
+sets your edits aside, so nothing lands on rows that moved underneath it. A banner lists them and
+offers to reapply your cell edits at the same addresses, each checked as if typed, or discard them.
+Row and column changes are never reapplied; the banner names them so you can redo them by hand, and
+lists any cell it could not put back. Held edits stay held across later outside writes, but they are
+not saved: closing the tab discards them.
 
 Saving changes only what you edited. Styles, column widths, charts, pictures, comments, macros and
 every other part of the file keep their exact bytes, so the file opens in Excel exactly as before

@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx'
 import path from 'node:path'
 import { DEFAULT_FIXTURE_DIR, makeFixtures } from '../scripts/make-fixtures.mjs'
 import { launch, openEditor, postFile, savedFile } from './harness.mjs'
+import { REL, num, row, str, workbook } from './xlsx-fixture.mjs'
 
 const FIXTURES = DEFAULT_FIXTURE_DIR
 const SCREENSHOTS = process.env.SPREADSHEET_SCREENSHOTS
@@ -441,7 +442,7 @@ describe('outside writes', () => {
     await page.keyboard.press('Enter')
     await page.evaluate((base64) => window.__merge(base64), Buffer.from(book([['new', 0], ['a', 1], ['b', 2]])).toString('base64'))
     await frame.locator('#conflict').waitFor()
-    assert.match(await text(frame, '#conflict-text'), /changed outside Orca .* your edit to 1 cell is set aside/)
+    assert.match(await text(frame, '#conflict-text'), /set aside rather than merged\. .*Your edit to 1 cell can go back at the same addresses\. Held edits are not saved/)
     assert.equal(await frame.locator('[role="row"][aria-rowindex="2"] [role="gridcell"][aria-colindex="2"]').innerText(), 'new')
     assert.equal(await frame.locator('[role="row"][aria-rowindex="3"] [role="gridcell"][aria-colindex="3"]').innerText(), '1')
     await screenshot(page, 'merge-set-aside')
@@ -450,6 +451,54 @@ describe('outside writes', () => {
     assert.equal(await frame.locator('[role="row"][aria-rowindex="3"] [role="gridcell"][aria-colindex="3"]').innerText(), '20')
     const saved = XLSX.read(await savedFile(page), { dense: true }).Sheets.Sheet1['!data']
     assert.deepEqual(saved.map((r) => r.map((c) => c?.v)), [['new', 0], ['a', 20], ['b', 2]])
+    assert.deepEqual(errors.map(String), [])
+    await page.close()
+  })
+})
+
+describe('reapplying held edits', () => {
+  test('only cell edits go back, each checked; row changes and refused cells are listed', async () => {
+    const data = (names) => names.map((name, i) => row(i + 1, str(`A${i + 1}`, name) + num(`B${i + 1}`, i))).join('')
+    const plain = workbook([{ name: 'Sheet1', data: data(['Name', 'a', 'b', 'c', 'd']) }])
+    // The outside version adds a row and makes A1:B5 an Excel table, so A1 is now a table header.
+    const tableRel = `<Relationship Id="rId1" Type="${REL}/table" Target="../tables/table1.xml"/>`
+    const withTable = workbook([{ name: 'Sheet1', data: data(['Name', 'new', 'a', 'b', 'c', 'd']), rels: tableRel }], {
+      'xl/tables/table1.xml': `<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="T" ref="A1:B6"><tableColumns count="2"><tableColumn id="1" name="Name"/><tableColumn id="2" name="B"/></tableColumns></table>`
+    })
+    const { page, frame, errors } = await openEditor(browser)
+    await postFile(page, frame, Buffer.from(plain), 'xlsx')
+    const cell = (address) => {
+      const { r, c } = XLSX.utils.decode_cell(address)
+      return frame.locator(`[role="row"][aria-rowindex="${r + 2}"] [role="gridcell"][aria-colindex="${c + 2}"]`)
+    }
+    await cell('A1').click()
+    await page.keyboard.type('Who')
+    await page.keyboard.press('Enter')
+    await cell('B3').click()
+    await page.keyboard.type('42')
+    await page.keyboard.press('Enter')
+    await cell('A5').click()
+    await page.keyboard.press('Shift+F10')
+    await frame.locator('[role="menuitem"]', { hasText: 'Delete row' }).click()
+    await page.evaluate((base64) => window.__merge(base64), Buffer.from(withTable).toString('base64'))
+    await frame.locator('#conflict').waitFor()
+    const held = await text(frame, '#conflict-text')
+    assert.match(held, /Your edits to 2 cells can go back/)
+    assert.match(held, /Not reapplied, redo by hand if still wanted: delete 1 row from row 5 on Sheet1\./)
+    // A later outside write keeps them held.
+    await page.evaluate((base64) => window.__merge(base64), Buffer.from(withTable).toString('base64'))
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    assert.equal(await text(frame, '#conflict-text'), held)
+    await screenshot(page, 'held-edits')
+    await frame.locator('#conflict-apply').click()
+    assert.match(await text(frame, '#conflict-text'), /^Reapplied 1 cell\. Not reapplied: Sheet1!A1 \(a table header or totals cell\)\. Row and column changes to redo by hand: delete 1 row from row 5 on Sheet1\.$/)
+    assert.equal(await cell('A1').innerText(), 'Name')
+    assert.equal(await cell('B3').innerText(), '42')
+    assert.equal(await cell('A5').innerText(), 'c', 'the row deletion was not replayed')
+    const saved = XLSX.read(await savedFile(page), { dense: true }).Sheets.Sheet1['!data']
+    assert.deepEqual(saved.map((r) => r.map((c) => c?.v)), [['Name', 0], ['new', 1], ['a', 42], ['b', 3], ['c', 4], ['d', 5]])
+    await frame.locator('#conflict-discard').click()
+    assert.equal(await frame.locator('#conflict').isVisible(), false)
     assert.deepEqual(errors.map(String), [])
     await page.close()
   })

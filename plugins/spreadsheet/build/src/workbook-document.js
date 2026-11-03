@@ -3,6 +3,7 @@
 // edited; merging replays this tab's operations onto a version of the file someone else wrote.
 import { read } from 'xlsx'
 import { odsPackage, odsShiftBlocker, odsFormulas, writeOds } from './ods-writer.js'
+import { tokenize } from './formula-tokens.js'
 import { openWorkbook } from './open-workbook.js'
 import { applyOp, portableOp } from './workbook-edits.js'
 import { buildWorkbookModel } from './workbook-model.js'
@@ -181,12 +182,15 @@ export function mergeRefusal(base, outside, pending) {
   if (!before || !after) return 'unreadable'
   if (before.all.map((sheet) => sheet.name).join('\n') !== after.all.map((sheet) => sheet.name).join('\n')) return 'sheets changed'
   const touched = new Map()
+  // The ranges this tab's typed formulas read: data that moved under them would change their answer.
+  const reads = []
   for (const op of pending) {
     const key = op.sheet.toUpperCase()
     if (!touched.has(key)) touched.set(key, { rows: new Set(), columns: new Set() })
-    for (const { r, c } of op.cells) {
+    for (const { r, c, cell } of op.cells) {
       touched.get(key).rows.add(r)
       touched.get(key).columns.add(c)
+      if (cell?.f) reads.push(...formulaRanges(cell.f, op.sheet))
     }
   }
   for (let index = 0; index < before.all.length; index++) {
@@ -194,17 +198,42 @@ export function mergeRefusal(base, outside, pending) {
     const b = after.all[index]
     if (a.rowCount !== b.rowCount || a.columnCount !== b.columnCount) return 'a sheet changed size'
     if (JSON.stringify(a.merges) !== JSON.stringify(b.merges)) return 'merged cells changed'
-    const mark = touched.get(a.name.toUpperCase())
-    if (!mark) continue
+    const key = a.name.toUpperCase()
+    const mark = touched.get(key)
+    const sheetReads = reads.filter((range) => range.sheet === key)
+    if (!mark && sheetReads.length === 0) continue
     for (let r = 0; r < a.rowCount; r++) {
       for (let c = 0; c < a.columnCount; c++) {
         if (cellSignature(a.data[r]?.[c]) === cellSignature(b.data[r]?.[c])) continue
         // A change in a row or column this tab edited may be a move this merge cannot see.
-        if (mark.rows.has(r) || mark.columns.has(c)) return 'the same rows or columns changed'
+        if (mark && (mark.rows.has(r) || mark.columns.has(c))) return 'the same rows or columns changed'
+        if (sheetReads.some((range) => r >= range.r0 && r <= range.r1 && c >= range.c0 && c <= range.c1)) {
+          return 'cells a typed formula reads changed'
+        }
       }
     }
   }
   return null
+}
+
+/** The ranges a formula reads, with upper-case sheet names; everything, when it cannot be read. */
+function formulaRanges(formula, hostSheet) {
+  try {
+    return tokenize(formula)
+      .filter((token) => token.type === 'ref')
+      .map((token) => {
+        const b = token.b ?? token.a
+        return {
+          sheet: (token.sheet ?? hostSheet).toUpperCase(),
+          r0: token.kind === 'columns' ? 0 : Math.min(token.a.r, b.r),
+          r1: token.kind === 'columns' ? Infinity : Math.max(token.a.r, b.r),
+          c0: token.kind === 'rows' ? 0 : Math.min(token.a.c, b.c),
+          c1: token.kind === 'rows' ? Infinity : Math.max(token.a.c, b.c)
+        }
+      })
+  } catch {
+    return [{ sheet: hostSheet.toUpperCase(), r0: 0, r1: Infinity, c0: 0, c1: Infinity }]
+  }
 }
 
 const cellSignature = (cell) => (cell ? `${cell.t}|${cell.v}|${cell.f ?? ''}` : '')

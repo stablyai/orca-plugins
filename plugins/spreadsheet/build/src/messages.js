@@ -15,10 +15,24 @@ export const MESSAGES = {
   staleFormula: "Spreadsheet can't calculate this formula, so it shows the result saved in the file. Desktop spreadsheet apps recalculate it when they open the file."
 }
 
+const plural = (count, one, many) => (count === 1 ? one : many.replace('#', count.toLocaleString()))
+
 /** An outside write changed what this tab's unsaved edits depended on, so they were set aside. */
-MESSAGES.mergeRefused = (cells) =>
-  `This file changed outside Orca while you had unsaved edits, in a way they can't merge into safely. ` +
-  `It now shows the new file; your ${cells === 1 ? 'edit to 1 cell is' : cells > 0 ? `edits to ${cells} cells are` : 'row and column changes are'} set aside.`
+MESSAGES.mergeRefused = ({ cells, shifts }) => {
+  const parts = ['This file changed outside Orca while you had unsaved edits, so they were set aside rather than merged. It shows the new file.']
+  if (cells) parts.push(`${plural(cells, 'Your edit to 1 cell', 'Your edits to # cells')} can go back at the same addresses.`)
+  if (shifts.length) parts.push(`Not reapplied, redo by hand if still wanted: ${shifts.join('; ')}.`)
+  parts.push('Held edits are not saved: closing this tab discards them.')
+  return parts.join(' ')
+}
+
+/** What reapplying held edits did not put back. */
+MESSAGES.reapplied = (count, skipped, shifts) => {
+  const parts = [`Reapplied ${plural(count, '1 cell', '# cells')}.`]
+  if (skipped.length) parts.push(`Not reapplied: ${skipped.join(', ')}.`)
+  if (shifts.length) parts.push(`Row and column changes to redo by hand: ${shifts.join('; ')}.`)
+  return parts.join(' ')
+}
 
 const BINARY_FORMATS = { xls: 'Excel 97-2003 (.xls)', xlsb: 'Excel binary (.xlsb)' }
 

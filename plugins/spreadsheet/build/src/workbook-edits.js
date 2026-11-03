@@ -72,6 +72,8 @@ function applyShift(model, op) {
   // Formulas first, at their old positions, so the restore list can find them after an undo.
   const formulas = []
   const seeds = []
+  // Formulas whose references only moved: same inputs, same result, unless data came or went.
+  const moved = []
   for (const other of model.all) {
     other.data.forEach((row, r) => {
       row?.forEach((cell, c) => {
@@ -82,7 +84,7 @@ function applyShift(model, op) {
           formulas.push({ sheet: other.name, r, c, f: cell.f, ...(cell.F ? { F: cell.F } : {}) })
           cell.f = f
           if (F !== undefined) cell.F = F
-          seeds.push(cell)
+          ;(f.includes('#REF!') ? seeds : moved).push(cell)
         } else if (dependsOnWholeAxis(cell, other.name, shift)) {
           seeds.push(cell)
         }
@@ -141,6 +143,9 @@ function applyShift(model, op) {
     }
     for (const { r, c } of op.restore.cells) if (sheet.data[r][c].f) seeds.push(sheet.data[r][c])
   }
+  // Recalculate moved formulas only when cells with data were deleted or brought back; otherwise
+  // their results stand, and ones this calculator cannot evaluate keep them (no stale mark).
+  if (cells.length > 0 || (op.restore?.cells.length ?? 0) > 0) seeds.push(...moved)
   measureExtent(sheet)
   sheet.$edited = true
   model.$shifted = true

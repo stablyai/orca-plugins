@@ -2,7 +2,7 @@
 // buffer, dirty state and saving; this frame parses the bytes with SheetJS, shows every visible sheet
 // in a virtualized grid, and turns edits into operations that workbook-document.js saves back into
 // the file's own XML (see build/README.md).
-import { rangeAddress } from './address.js'
+import { cellAddress, columnName, rangeAddress } from './address.js'
 import { cellFromInput, editText } from './cell-input.js'
 import { cellFormula, cellRawValue, cellText, isEmptyCell } from './cell-display.js'
 import { createGridView } from './grid-view.js'
@@ -12,7 +12,7 @@ import { parseTsv } from './tsv-paste.js'
 import { clampSelection, rangeCellCount } from './selection.js'
 import { applyOp } from './workbook-edits.js'
 import { createWorkbookCodec, modelOf, openSource, shiftBlocker, touchesLockedCell } from './workbook-document.js'
-import { getCell } from './workbook-model.js'
+import { findSheet, getCell } from './workbook-model.js'
 
 const GRID_FONT = '12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 // Rich-text copies of huge ranges cost more than they are worth; plain text is always included.
@@ -79,6 +79,8 @@ let redoStack = []
 let editing = null
 /** This tab's edits an outside write kept from merging, until reapplied or discarded. */
 let rejected = null
+/** What the last reapply could not put back, shown until dismissed. */
+let outcome = null
 let noteTimer = 0
 let announceTimer = 0
 
@@ -131,7 +133,10 @@ function load(next) {
   activeIndex = -1
   undoStack = []
   redoStack = []
-  rejected = next.rejected?.length ? next.rejected : null
+  // Held edits stay held across later outside writes, until the person reapplies or discards them.
+  const held = [...(rejected ?? []), ...(next.rejected ?? [])]
+  rejected = held.length ? held : null
+  outcome = null
   if (result.status !== 'ok') {
     opened = null
     showMessage(MESSAGES[result.status])
@@ -162,31 +167,69 @@ function renderNotice() {
 }
 
 function renderConflict() {
-  ui.conflict.hidden = !rejected
-  if (!rejected) return
-  const cells = rejected.reduce((sum, op) => sum + (op.cells?.length ?? 0), 0)
-  ui.conflictText.textContent = MESSAGES.mergeRefused(cells)
+  const apply = $('conflict-apply')
+  const discard = $('conflict-discard')
+  ui.conflict.hidden = !rejected && !outcome
+  if (rejected) {
+    ui.conflictText.textContent = MESSAGES.mergeRefused(heldSummary(rejected))
+    apply.hidden = !rejected.some((op) => op.type === 'cells')
+    discard.textContent = 'Discard them'
+  } else if (outcome) {
+    ui.conflictText.textContent = outcome
+    apply.hidden = true
+    discard.textContent = 'Dismiss'
+  } else {
+    return
+  }
   announce(ui.conflictText.textContent)
 }
 
-/** Puts the edits an outside write kept from merging back on top of the new file, as asked. */
+/** Held edits in words: how many cells, and each row or column change, which is never reapplied. */
+function heldSummary(ops) {
+  const cells = ops.reduce((sum, op) => sum + (op.type === 'cells' ? op.cells.length : 0), 0)
+  return { cells, shifts: ops.filter((op) => op.type === 'shift').map(describeShift) }
+}
+
+function describeShift(op) {
+  const count = Math.abs(op.count)
+  const rows = op.axis === 'row'
+  const noun = rows ? (count === 1 ? 'row' : 'rows') : count === 1 ? 'column' : 'columns'
+  const at = rows ? `row ${op.at + 1}` : `column ${columnName(op.at)}`
+  return op.count > 0
+    ? `insert ${count} ${noun} ${rows ? 'above' : 'left of'} ${at} on ${op.sheet}`
+    : `delete ${count} ${noun} from ${at} on ${op.sheet}`
+}
+
+/**
+ * Puts held cell edits back at the same cells, each through the checks a typed edit gets. Row and
+ * column changes are never reapplied; they and any refused cell are listed for the person to redo.
+ */
 function reapplyRejected() {
   if (!rejected || !isEditable()) return
   const ops = rejected
   rejected = null
-  renderConflict()
-  let last = null
+  const skipped = []
+  let reapplied = 0
   for (const op of ops) {
-    const inverse = applyOp(model, op)
-    undoStack.push({ op, inverse, sheet: op.sheet, selection: grid.state().selection })
-    last = op
+    if (op.type !== 'cells') continue
+    const sheet = findSheet(model, op.sheet)
+    const allowed = []
+    for (const entry of op.cells) {
+      const address = `${op.sheet}!${cellAddress(entry.r, entry.c)}`
+      if (!sheet) skipped.push(`${address} (the sheet is gone)`)
+      else if (touchesLockedCell(value.source, op.sheet, [entry])) skipped.push(`${address} (a table header or totals cell)`)
+      else allowed.push(entry)
+    }
+    if (allowed.length && commit({ type: 'cells', sheet: sheet.name, cells: allowed })) reapplied += allowed.length
   }
-  redoStack = []
-  if (last) publish([...value.ops, ...ops], last)
+  const shifts = ops.filter((op) => op.type === 'shift').map(describeShift)
+  outcome = skipped.length || shifts.length ? MESSAGES.reapplied(reapplied, skipped, shifts) : null
+  renderConflict()
 }
 
 function discardRejected() {
   rejected = null
+  outcome = null
   renderConflict()
   grid.focus()
 }
