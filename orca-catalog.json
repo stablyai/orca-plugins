@@ -668,12 +668,75 @@
         "ref": "main",
         "path": "plugins/spreadsheet"
       },
-      "description": "View Excel and OpenDocument spreadsheets in Orca's editor: every sheet, formulas and formatted values, even for very large files.",
+      "description": "Open and edit Excel and OpenDocument spreadsheets in Orca's editor: cells, formulas, rows and columns, with undo. Saves .xlsx, .xlsm and .ods in place, keeping their formatting.",
       "categories": [
         "editors",
         "official"
       ],
       "releases": [
+        {
+          "version": "2.0.0",
+          "commit": "1bfc3c2bb7334a3af0152e8455feda767091b8c3",
+          "contentHash": "bd4ac696ffca83286c15ce74215c94e27171638a5c32c3b5bf4fa5d1d044bf81",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "changelog": "Editing: cell values and formulas, inserting and deleting rows and columns, clearing, paste, and undo and redo. Saves .xlsx, .xlsm and .ods in place, changing only what was edited, so styles, charts, comments and macros are kept. Formulas recalculate for common functions, and outside writes merge with unsaved edits. .xls and .xlsb open read-only. Needs Orca 1.4.248.",
+          "name": "Spreadsheet",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Spreadsheet",
+              "detail": ".xlsx, .xlsm, .xlsb, .xls, .ods"
+            }
+          ],
+          "fileTypes": [
+            "xlsx",
+            "xlsm",
+            "xlsb",
+            "xls",
+            "ods"
+          ],
+          "editorFileTypes": [
+            "xlsx",
+            "xlsm",
+            "xlsb",
+            "xls",
+            "ods"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/spreadsheet/images/cover.png",
+              "alt": "A quarterly summary workbook being edited: East's revenue changed and the totals recalculated, and a formula typed into a new Target column",
+              "sha256": "9b9d7be4eed1fd0c1a7e743fb718d6227661ee4dd1b7813a720c512fcc342f6a",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/spreadsheet/images/editing.png",
+                "alt": "Two rows selected with the cell menu open: insert rows above or below, delete rows, insert or delete columns, clear contents",
+                "sha256": "4bf69a3d594d6545d51a27cf895fbd433cecf96decd1d056d7d09f403746062a",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/spreadsheet/images/sheets.png",
+                "alt": "A 50,000-row data sheet with a block of cells selected and its count, sum and average in the status bar",
+                "sha256": "138c43ecd911f630b89d5290f9fb28fcefd33068bc38dcc8e8a351eef28887bd",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/spreadsheet/images/dark.png",
+                "alt": "The summary workbook in Orca's dark theme after an edit, with the changed revenue, recalculated totals and a #DIV/0! error in red",
+                "sha256": "b7fdb8e3e2604e015b9a6e5af00d3d7b69d8eea810ad76ba6f7bbe8482b00b39",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
         {
           "version": "1.1.0",
           "commit": "07590d2c7bdc8c6c9299123106b9e0525656a411",
