@@ -19,3 +19,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--orca-ring, 
 .link-bar label { white-space: nowrap; color: var(--orca-muted-foreground, #737373); }
 .link-bar input { flex: 1; min-width: 0; font: inherit; color: var(--orca-foreground, #171717); background: var(--orca-muted, #f5f5f5); border: 1px solid var(--orca-border, #e5e5e5); border-radius: 3px; padding: 5px; }
 @media (max-width: 480px) { .label { display: none; } .link-bar label { display: none; } }
+.find-bar { position: relative; z-index: 3; flex: none; display: flex; gap: 4px; align-items: center; padding: 5px 12px; border-bottom: 1px solid var(--orca-border, #e5e5e5); background: var(--orca-background, white); }
+.find-bar input { flex: 0 1 280px; min-width: 0; height: 28px; font: inherit; color: var(--orca-foreground, #171717); background: var(--orca-muted, #f5f5f5); border: 1px solid var(--orca-border, #e5e5e5); border-radius: 4px; padding: 4px 7px; }
+.find-count { min-width: 72px; padding: 0 6px; color: var(--orca-muted-foreground, #737373); font-variant-numeric: tabular-nums; white-space: nowrap; }
+button[aria-pressed="true"]#markup { background: var(--orca-accent, #e5e5e5); color: var(--orca-foreground, #171717); }

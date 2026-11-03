@@ -31,31 +31,62 @@ const TOKENS = {
   }
 }
 
-// The document half of Orca's frame API; the real one is in Orca's plugin-panel-shell.ts.
-const ORCA_SHIM = `(function () {
+// The part of Orca's frame API this viewer uses; the real one is Orca's frame shell. `session()` resolves
+// with the first document and reports newer ones through onReplace, as Orca's does for a viewer
+// that never edits. `shell` exists only when the test offers it, as in the desktop app's isolated frame.
+const orcaShim = ({ shell }) => `(function () {
   var listeners = []
   var post = function (message) { window.parent.postMessage(Object.assign({ orca: 1 }, message), '*') }
-  window.orca = Object.freeze({
+  window.__opened = []
+  window.__changes = 0
+  var api = {
+    host: Object.freeze({ has: function (name) { return ${shell} && name === 'shell.openExternal' } }),
     document: Object.freeze({
-      onDidChange: function (fn) { listeners.push(fn); return { dispose: function () {} } }
+      session: function (options) {
+        return new Promise(function (resolve) {
+          var version = -Infinity
+          var replaced = []
+          var session = {
+            value: undefined, readOnly: true,
+            change: function () { window.__changes++ },
+            flush: function () { return Promise.resolve() },
+            onReplace: function (fn) { replaced.push(fn); return { dispose: function () {} } },
+            dispose: function () {}
+          }
+          listeners.push(function (doc) {
+            if (!(doc.version > version)) return
+            var first = version === -Infinity
+            version = doc.version
+            session.value = options.decode(doc.content)
+            if (first) resolve(session)
+            else replaced.forEach(function (fn) { fn(session.value) })
+          })
+        })
+      }
     })
+  }
+  if (${shell}) api.shell = Object.freeze({
+    openExternal: function (url) {
+      window.__opened.push({ url: url, active: navigator.userActivation.isActive })
+      return Promise.resolve(window.__openResult || { opened: true })
+    }
   })
+  window.orca = Object.freeze(api)
   window.addEventListener('message', function (event) {
     var m = event.data
     if (event.source !== window.parent || !m || m.orca !== 1 || m.kind !== 'evt') return
-    if (m.event === 'ping') post({ kind: 'evt', event: 'pong', payload: m.payload })
     if (m.event === 'editor.document') listeners.forEach(function (fn) { fn(m.payload) })
   })
   post({ kind: 'evt', event: 'ready', payload: { protocol: 1 } })
 })()`
 
-export function frameDocument(theme = 'light', html = EDITOR_HTML) {
+export function frameDocument(theme = 'light', { shell = false, csp = true } = {}, html = EDITOR_HTML) {
   const tokens = Object.entries(TOKENS[theme]).map(([name, value]) => `--orca-${name}:${value};`).join('')
   return (
     `<!doctype html>\n<html class="${theme}">\n<head>\n<meta charset="utf-8">\n` +
-    `<meta http-equiv="Content-Security-Policy" content="${CSP}">\n` +
+    (csp ? `<meta http-equiv="Content-Security-Policy" content="${CSP}">\n` : '') +
     `<style id="orca-design-tokens">:root{${tokens}}</style>\n` +
-    `<script>${ORCA_SHIM}</script>\n</head>\n${html}`
+    `<script>${orcaShim({ shell })}</script>\n</head>\n${html}`
   )
 }
 
@@ -91,19 +122,38 @@ export async function launch() {
   return chromium.launch({ headless: true })
 }
 
+// The desktop app's isolated frame: its own origin with storage, served with this header.
+const ISOLATED_CSP =
+  "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; " +
+  "img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' data: blob:; " +
+  "worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+
 /**
- * Opens a fresh host page with the editor frame and waits for `ready`.
+ * Opens a fresh host page with the editor frame and waits for `ready`. `isolated` serves the editor
+ * from its own origin, as the desktop app does, with `orca.shell`; otherwise it is the opaque-origin
+ * srcdoc frame of a browser client. Pass `context` to share storage between pages.
  * @returns {Promise<{ page: import('playwright-core').Page, frame: import('playwright-core').Frame }>}
  */
-export async function openEditor(browser, { theme = 'light', width = 1280, height = 800 } = {}) {
-  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 2 })
+export async function openEditor(browser, { theme = 'light', width = 1280, height = 800, isolated = false, context } = {}) {
+  const page = await (context ?? browser).newPage({ viewport: { width, height }, deviceScaleFactor: 2 })
   const errors = []
   page.on('pageerror', (error) => errors.push(error))
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(new Error(message.text()))
   })
-  await page.setContent(HOST_PAGE)
-  await page.evaluate((srcdoc) => (document.getElementById('editor').srcdoc = srcdoc), frameDocument(theme))
+  if (isolated) {
+    await page.route('http://plugin.test/**', (route) => route.fulfill({
+      contentType: 'text/html', headers: { 'content-security-policy': ISOLATED_CSP },
+      body: frameDocument(theme, { shell: true, csp: false })
+    }))
+    await page.route('http://orca.test/**', (route) => route.fulfill({
+      contentType: 'text/html', body: HOST_PAGE.replace('sandbox="allow-scripts"', 'src="http://plugin.test/editor.html"')
+    }))
+    await page.goto('http://orca.test/')
+  } else {
+    await page.setContent(HOST_PAGE)
+    await page.evaluate((srcdoc) => (document.getElementById('editor').srcdoc = srcdoc), frameDocument(theme))
+  }
   await page.waitForFunction(() => window.__readyCount > 0)
   const frame = page.frames().find((candidate) => candidate !== page.mainFrame())
   return { page, frame, errors }
