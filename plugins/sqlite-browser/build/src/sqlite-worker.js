@@ -18,7 +18,7 @@ const ops = {
   reopen: (id, view) => engine.reopen(id, view),
   closeResult: (id) => engine.closeResult(id),
   rows: (id, start, count) => engine.rows(id, start, count),
-  cell: (id, index, column) => engine.cell(id, index, column),
+  cell: (id, index, column, maxChars, maxBytes) => engine.cell(id, index, column, maxChars, maxBytes),
   copy: (...args) => engine.copy(...args),
   csv: (id, maxBytes) => engine.csv(id, maxBytes),
   run(sql) {

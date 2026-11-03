@@ -539,7 +539,7 @@ export class App {
     this.detailCell = { key, cell: null }
     let cell
     try {
-      cell = await this.client.call('cell', shown.rows.id, focus.r, focus.c)
+      cell = await this.client.call('cell', shown.rows.id, focus.r, focus.c, DETAIL_TEXT_CHARS, HEX_PREVIEW_BYTES)
     } catch {
       return
     }
@@ -551,18 +551,18 @@ export class App {
     detailBody.textContent = ''
     detailHead.append(element('span', 'name', column.name))
     let label = cell.t
-    if (cell.t === 'text') label += ` · ${plural(cell.v.length, 'character')}`
-    if (cell.t === 'blob') label += ` · ${formatSize(cell.v.length)}`
+    if (cell.t === 'text') label += ` · ${plural(cell.length, 'character')}`
+    if (cell.t === 'blob') label += ` · ${formatSize(cell.length)}`
     detailHead.append(document.createTextNode(label))
     const note = (text) => detailBody.append(element('span', 'note', text))
     if (cell.t === 'null') {
       note('NULL')
     } else if (cell.t === 'blob') {
       detailBody.className = 'hex'
-      detailBody.textContent = hexDump(cell.v.subarray(0, HEX_PREVIEW_BYTES))
-      if (cell.v.length > HEX_PREVIEW_BYTES) note(`\nShowing the first ${formatSize(HEX_PREVIEW_BYTES)}. Copy gets the whole value as hex.`)
-    } else if (cell.t === 'text' && cell.v.length > DETAIL_TEXT_CHARS) {
-      detailBody.textContent = cell.v.slice(0, DETAIL_TEXT_CHARS)
+      detailBody.textContent = hexDump(cell.v)
+      if (cell.truncated) note(`\nShowing the first ${formatSize(HEX_PREVIEW_BYTES)}. Copy gets the whole value as hex.`)
+    } else if (cell.t === 'text' && cell.truncated) {
+      detailBody.textContent = cell.v
       note(`\n\nShowing the first ${nf.format(DETAIL_TEXT_CHARS)} characters. Copy gets the whole value.`)
     } else {
       detailBody.textContent = cell.t === 'real' ? formatReal(cell.v) : String(cell.v)
@@ -577,7 +577,8 @@ export class App {
     const columns = wholeRows ? shown.columns.map((_, index) => index) : columnRange(range)
     if (!withNames && !wholeRows && range.r0 === range.r1 && range.c0 === range.c1) {
       const cell = this.detailCell
-      return cell?.key === `${shown.rows.id}:${range.r0}:${range.c0}` && cell.cell ? cellText(cell.cell) : null
+      // A cut preview is not the value; the worker copies that, with its size cap.
+      return cell?.key === `${shown.rows.id}:${range.r0}:${range.c0}` && cell.cell && !cell.cell.truncated ? cellText(cell.cell) : null
     }
     const rows = range.r1 - range.r0 < 5000 ? shown.rows.loaded(range.r0, range.r1) : null
     if (!rows) return null

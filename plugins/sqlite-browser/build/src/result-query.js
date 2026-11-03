@@ -28,7 +28,10 @@ export function parseFilter(input) {
   if (comparison && comparison[2] !== '') {
     const op = comparison[1] === '<>' ? '!=' : comparison[1]
     const raw = comparison[2]
-    return { op, value: NUMBER.test(raw) ? Number(raw) : raw }
+    if (!NUMBER.test(raw)) return { op, value: raw }
+    // Why text: Number() rounds integers past 2^53, such as 64-bit ids, so they would never match.
+    const bigInteger = /^[-+]?\d+$/.test(raw) && !Number.isSafeInteger(Number(raw))
+    return { op, value: bigInteger ? raw : Number(raw), text: raw, integer: bigInteger }
   }
   return { op: 'contains', value: text }
 }
@@ -45,8 +48,16 @@ export function filterCondition(expr, filter) {
       return { sql: `${expr} IS NOT NULL`, params: [] }
     case 'contains':
       return textMatch(expr, filter.value)
-    default:
-      return { sql: `${expr} ${filter.op} ?`, params: [filter.value] }
+    default: {
+      const operand = filter.integer ? 'CAST(? AS INTEGER)' : '?'
+      // Why both forms for = and !=: query results have no column affinity, so '90210' as text
+      // would not equal the number 90210 there, as it does in its table.
+      if (filter.text !== undefined && (filter.op === '=' || filter.op === '!=')) {
+        const join = filter.op === '=' ? 'OR' : 'AND'
+        return { sql: `(${expr} ${filter.op} ${operand} ${join} ${expr} ${filter.op} ?)`, params: [filter.value, filter.text] }
+      }
+      return { sql: `${expr} ${filter.op} ${operand}`, params: [filter.value] }
+    }
   }
 }
 

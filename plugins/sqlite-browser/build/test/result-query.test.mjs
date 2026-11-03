@@ -7,7 +7,7 @@ import { cellText, formatReal, toClipboard } from '../src/value-format.js'
 test('a column filter reads as contains, a comparison or a NULL test', () => {
   assert.equal(parseFilter('  '), null)
   assert.deepEqual(parseFilter('blue'), { op: 'contains', value: 'blue' })
-  assert.deepEqual(parseFilter('>= 10'), { op: '>=', value: 10 })
+  assert.deepEqual(parseFilter('>= 10'), { op: '>=', value: 10, text: '10', integer: false })
   assert.deepEqual(parseFilter('<>x'), { op: '!=', value: 'x' })
   assert.deepEqual(parseFilter('=2024-01-01'), { op: '=', value: '2024-01-01' })
   assert.deepEqual(parseFilter('NULL'), { op: 'null' })
@@ -40,4 +40,9 @@ test('values read as sqlite3 prints them', () => {
   assert.equal(cellText({ t: 'null', v: null }), '')
   assert.equal(toClipboard([[{ t: 'text', v: 'a\tb' }]]), 'a\tb', 'one cell copies as it is')
   assert.equal(toClipboard([[{ t: 'text', v: 'a\tb' }, { t: 'null', v: null }]], ['x', 'y']), 'x\ty\n"a\tb"\t')
+})
+
+test('integers past 2^53 compare as integers, not rounded numbers', () => {
+  assert.deepEqual(parseFilter('=1234567890123456789'), { op: '=', value: '1234567890123456789', text: '1234567890123456789', integer: true })
+  assert.deepEqual(whereClause(['"a"'], { 0: '>1234567890123456789' }), { sql: 'WHERE "a" > CAST(? AS INTEGER)', params: ['1234567890123456789'] })
 })

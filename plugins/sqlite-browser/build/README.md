@@ -12,7 +12,7 @@ node build.mjs   # also runs npm test
 ```
 
 The build is deterministic: the same lockfile produces the same bytes. It also rewrites
-`../THIRD_PARTY_NOTICES.txt` from the bundled package's licence and `sqlite-notice.txt`, and fails
+`../THIRD_PARTY_NOTICES.txt` from the bundled package's licence, `sqlite-notice.txt` and `licenses/` (the Emscripten runtime and musl libc in the WebAssembly), and fails
 if any file is over 1 MiB (the catalog's limit) or evaluates strings as code (the frame's CSP
 refuses `eval` and `Function`).
 

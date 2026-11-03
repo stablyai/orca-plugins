@@ -185,3 +185,34 @@ test('closing a result drops its temp table', () => {
   assert.throws(() => engine.rows(sorted.id, 0, 1), /closed/)
   engine.close()
 })
+
+test('filters match 64-bit integers exactly, and numbers match text in query results', () => {
+  const engine = new SqliteEngine(SQL, fileOf("CREATE TABLE m (id INTEGER, zip TEXT); INSERT INTO m VALUES (1234567890123456789, '90210'), (1234567890123456768, '10001');"))
+  assert.equal(engine.openObject('m', { filters: { 0: '=1234567890123456789' } }).count, 1)
+  assert.equal(engine.openObject('m', { filters: { 0: '!=1234567890123456789' } }).count, 1)
+  assert.equal(engine.openObject('m', { filters: { 0: '>1234567890123456768' } }).count, 1)
+  const { result } = engine.run('SELECT zip FROM m')
+  assert.equal(engine.reopen(result.id, { filters: { 0: '=90210' } }).count, 1)
+  assert.equal(engine.reopen(result.id, { filters: { 0: '!=90210' } }).count, 1)
+  engine.close()
+})
+
+test('PRAGMA results keep integers as integers', () => {
+  const engine = new SqliteEngine(SQL, fileOf(MUSIC))
+  const { result } = engine.run('PRAGMA table_info(artists)')
+  assert.deepEqual(engine.rows(result.id, 0, 1)[0].cells[0], { t: 'integer', v: 0n })
+  const sorted = engine.reopen(result.id, { filters: { 0: '>1' } })
+  assert.equal(sorted.count, 1)
+  engine.close()
+})
+
+test('the detail pane gets a capped preview of a huge cell, with its whole length', () => {
+  const engine = new SqliteEngine(SQL, fileOf(`CREATE TABLE big (t TEXT, b BLOB); INSERT INTO big VALUES ('${'x'.repeat(5000)}', zeroblob(100000));`))
+  const result = engine.openObject('big')
+  const text = engine.cell(result.id, 0, 0, 1000, 4096)
+  assert.deepEqual([text.v.length, text.length, text.truncated], [1000, 5000, true])
+  const blob = engine.cell(result.id, 0, 1, 1000, 4096)
+  assert.deepEqual([blob.v.length, blob.length, blob.truncated], [4096, 100000, true])
+  assert.throws(() => engine.copy(result.id, 0, 1, [1], false, 100000), /too much/)
+  engine.close()
+})

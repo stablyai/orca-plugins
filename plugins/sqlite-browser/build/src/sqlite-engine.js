@@ -267,10 +267,7 @@ export class SqliteEngine {
           : `typeof(${expr}), CASE typeof(${expr}) WHEN 'text' THEN substr(${expr}, 1, ${GRID_TEXT_CHARS + 1}) WHEN 'blob' THEN length(${expr}) ELSE ${expr} END`
       )
       .join(', ')
-    const [sql, params] =
-      result.kind === 'direct'
-        ? [`SELECT ${result.label ?? 'NULL'}, ${project} FROM ${result.from} LIMIT ? OFFSET ?`, [count, start]]
-        : [`SELECT label, ${project} FROM temp.${quoteId(result.table)} WHERE rowid > ? AND rowid <= ? ORDER BY rowid`, [start, start + count]]
+    const [sql, params] = this.window(result, project, start, count)
     const statement = this.db.prepare(sql)
     try {
       statement.bind(params)
@@ -341,10 +338,31 @@ export class SqliteEngine {
     return bytes.buffer
   }
 
-  /** One whole cell. */
-  cell(id, index, column) {
-    const [row] = this.rows(id, index, 1, true)
-    return row?.cells[column] ?? { t: 'null', v: null }
+  /** `SELECT label, <project>` over rows `start` to `start + count` of a result, with its params. */
+  window(result, project, start, count) {
+    return result.kind === 'direct'
+      ? [`SELECT ${result.label ?? 'NULL'}, ${project} FROM ${result.from} LIMIT ? OFFSET ?`, [count, start]]
+      : [`SELECT label, ${project} FROM temp.${quoteId(result.table)} WHERE rowid > ? AND rowid <= ? ORDER BY rowid`, [start, start + count]]
+  }
+
+  /**
+   * One cell for the detail pane: at most `maxChars` of text or `maxBytes` of a blob, with the whole
+   * `length` and `truncated` set when cut, so a huge value never crosses to the page whole.
+   */
+  cell(id, index, column, maxChars = Infinity, maxBytes = Infinity) {
+    const result = this.result(id)
+    const expr = result.exprs[column]
+    const cut = (limit) => (Number.isFinite(limit) ? `substr(${expr}, 1, ${Math.floor(limit)})` : expr)
+    const project = `typeof(${expr}), CASE typeof(${expr}) WHEN 'text' THEN ${cut(maxChars)} WHEN 'blob' THEN ${cut(maxBytes)} ELSE ${expr} END, length(${expr})`
+    const [sql, params] = this.window(result, project, index, 1)
+    const row = this.all(sql, params)[0]
+    if (!row) return { t: 'null', v: null }
+    const cell = cellOf(row[1], row[2])
+    if (cell.t === 'text' || cell.t === 'blob') {
+      cell.length = toNumber(row[3])
+      cell.truncated = cell.v.length < cell.length
+    }
+    return cell
   }
 
   /**
@@ -410,7 +428,8 @@ export class SqliteEngine {
       this.db.run(`CREATE TEMP TABLE ${quoteId(table)} (label, ${names.join(', ')})`)
       const insert = this.db.prepare(`INSERT INTO temp.${quoteId(table)} VALUES (NULL, ${names.map(() => '?').join(', ')})`)
       try {
-        for (const row of rows) insert.run(row)
+        // Why: a BigInt binds as text, which would make PRAGMA and EXPLAIN integers sort as text.
+        for (const row of rows) insert.run(row.map((value) => (typeof value === 'bigint' && Number.isSafeInteger(Number(value)) ? Number(value) : value)))
       } finally {
         insert.free()
       }

@@ -115,7 +115,8 @@ for (const { file, bytes } of written) {
   writeFileSync(file, bytes)
 }
 
-// Notices: the WebAssembly SQLite package (the only one with code in the build) and SQLite itself.
+// Notices: the WebAssembly SQLite package (the only one with code in the build), SQLite itself, and
+// the Emscripten runtime and musl libc compiled into it (build/licenses).
 const inputs = [...Object.keys(worker.metafile.inputs), ...Object.keys(page.metafile.inputs)]
 const packages = [...new Set(inputs.filter((input) => input.includes('node_modules/')).map((input) => /node_modules\/((?:@[^/]+\/)?[^/]+)/.exec(input)[1]))]
 if (packages.join() !== 'sql.js') {
@@ -127,7 +128,10 @@ writeFileSync(
   `The SQLite Browser editor in editor/ bundles the following software.\n\n` +
     `${sqljs.name}@${sqljs.version} (${sqljs.license}): editor/assets/sqlite-worker-*.js and editor/assets/sql-wasm.wasm\n\n` +
     `${readFileSync(path.join(SQLJS, 'LICENSE'), 'utf8').trim()}\n\n${'='.repeat(78)}\n\n` +
-    `${readFileSync(path.join(HERE, 'sqlite-notice.txt'), 'utf8').trim()}\n`
+    [path.join(HERE, 'sqlite-notice.txt'), path.join(HERE, 'licenses', 'emscripten.txt'), path.join(HERE, 'licenses', 'musl.txt')]
+      .map((file) => readFileSync(file, 'utf8').trim())
+      .join(`\n\n${'='.repeat(78)}\n\n`) +
+    '\n'
 )
 
 const totalBytes = written.reduce((sum, { bytes }) => sum + bytes.length, 0)
