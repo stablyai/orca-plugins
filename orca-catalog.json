@@ -2025,12 +2025,56 @@
         "ref": "main",
         "path": "plugins/image-markup"
       },
-      "description": "Mark up images with pen, arrow, box and text tools. Copy the result, or save it into the image with the original kept inside and the markup still editable.",
+      "description": "Mark up images in Orca: pen, highlighter, arrow, box, ellipse, text, numbered steps and redaction. Save the markup into the image with the original kept inside and still editable, or export a copy.",
       "categories": [
         "editors",
         "official"
       ],
       "releases": [
+        {
+          "version": "2.0.0",
+          "commit": "b7979a57cf733aa78608e1525c277d0dc94abd6f",
+          "contentHash": "3adfd0fdd813bf180f81e63830dfa14b17d799d35ade207fb3c154e797a3feef",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "changelog": "Saving runs on Orca's document session: Orca owns the unsaved state and the save, and markup Orca had not received when the file changed outside (say, an agent replacing the screenshot) is moved onto the new image instead of dropped. New Highlighter, Step number and Redact tools; redactions are removed from the saved file, original included. Export saves a copy as a new PNG. Needs Orca 1.4.248.",
+          "name": "Image Markup",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Markup",
+              "detail": ".png, .jpg, .jpeg, .webp, .gif, .bmp, .avif"
+            }
+          ],
+          "fileTypes": [
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "gif",
+            "bmp",
+            "avif"
+          ],
+          "editorFileTypes": [
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "gif",
+            "bmp",
+            "avif"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/image-markup/images/cover.webp",
+              "alt": "A sunlit reading nook in Image Markup, with a red ellipse around the chair and an arrow pointing to it from a Cozy corner label",
+              "sha256": "45a43a6c45b04e0382050cb9c78f90a18cf3146cc79163d049c2fa6d082d7137",
+              "width": 1600,
+              "height": 1000
+            }
+          },
+          "license": "MIT"
+        },
         {
           "version": "1.0.2",
           "commit": "1fe9ab8f3133f3712766c974aded306d648f483f",
