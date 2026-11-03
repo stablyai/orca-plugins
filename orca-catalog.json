@@ -2041,12 +2041,44 @@
         "ref": "main",
         "path": "plugins/docx"
       },
-      "description": "Preview Word (.docx) documents as read-only pages in Orca, with headers, footers, images and zoom controls.",
+      "description": "Read Word (.docx) documents in Orca: page layout, find, tracked changes, comments, links and zoom.",
       "categories": [
         "editors",
         "official"
       ],
       "releases": [
+        {
+          "version": "2.0.0",
+          "commit": "45761d66a16b487638776f626cee727b58f71d72",
+          "contentHash": "57f917a2790e29b33e35e49f77aff5a4fbb9f6fe0c4f04348f42fb2fa90888e1",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "changelog": "Find in the document (Cmd/Ctrl+F). Tracked changes and comments are shown, with a Markup switch. Web and email links open through Orca instead of only being copyable. Zoom and Markup are remembered per document. Uses Orca's document session; needs Orca 1.4.248.",
+          "name": "Word Document Viewer",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Word Preview",
+              "detail": ".docx"
+            }
+          ],
+          "fileTypes": [
+            "docx"
+          ],
+          "editorFileTypes": [
+            "docx"
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-docx/cover.jpg",
+              "alt": "Illustration of a document preview and blue document icon",
+              "sha256": "6c183bc8a56414e8bda11f9e3ea1393979165077776dfd3a279a00f80ffb50a1",
+              "width": 1586,
+              "height": 992
+            }
+          }
+        },
         {
           "version": "1.0.0",
           "commit": "819a8c4070bb86370d616a7ca976015146820c24",

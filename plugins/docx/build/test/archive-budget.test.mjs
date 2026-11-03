@@ -83,3 +83,9 @@ test('rejects a forged final directory signature in the zip comment', async () =
 test('can cancel obsolete documents during archive inspection', async () => {
   await assert.rejects(inspectArchive(zipSync({ a: media(10) }), { cancelled: () => true }), { name: 'AbortError' })
 })
+
+test('returns the inflated bytes of the entries it is asked to keep', async () => {
+  const kept = await inspectArchive(zipSync({ 'word/settings.xml': xml(200), 'word/document.xml': xml(300) }), { limits, keep: ['word/settings.xml'] })
+  assert.deepEqual([...kept.keys()], ['word/settings.xml'])
+  assert.deepEqual(kept.get('word/settings.xml'), xml(200))
+})
