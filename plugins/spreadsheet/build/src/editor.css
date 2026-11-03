@@ -54,6 +54,12 @@ body { background: var(--bg); color: var(--fg); font: 13px/1.4 var(--ui-font); -
 .formula:focus { border-color: var(--ring); }
 .result { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-fg);
   font-variant-numeric: tabular-nums; }
+.notice.conflict { display: flex; align-items: center; gap: 8px; color: var(--fg); }
+.notice.conflict span { flex: 1; min-width: 0; }
+.notice-button { flex: none; padding: 2px 10px; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px);
+  background: var(--bg); color: var(--fg); font: inherit; cursor: pointer; }
+.notice-button:hover { background: var(--accent); color: var(--accent-fg); }
+.notice-button:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .notice { flex: none; padding: 5px 10px; border-bottom: 1px solid var(--border); background: var(--muted); color: var(--muted-fg);
   font-size: 12px; }
 

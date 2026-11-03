@@ -2,6 +2,7 @@
 // formats come from the cell being replaced, so a typed 12 in a currency cell reads $12.00.
 import { SSF } from 'xlsx'
 import { CellError, formatGeneral, parseFormula } from './formula-eval.js'
+import { normalizeSeparators } from './formula-tokens.js'
 
 const ERROR_CODES = { '#NULL!': 0, '#DIV/0!': 7, '#VALUE!': 15, '#REF!': 23, '#NAME?': 29, '#NUM!': 36, '#N/A': 42, '#GETTING_DATA': 43 }
 const NUMBER = /^[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?$/
@@ -14,8 +15,9 @@ export function cellFromInput(text, previous) {
   const z = previous?.z
   if (text === '') return { cell: null }
   if (text.startsWith('=') && text.length > 1) {
-    const f = text.slice(1)
+    let f
     try {
+      f = normalizeSeparators(text.slice(1))
       parseFormula(f)
     } catch {
       return { error: 'invalid-formula' }

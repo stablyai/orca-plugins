@@ -11,8 +11,14 @@ export const MESSAGES = {
   otherSheet: 'This is a macro or dialog sheet. Spreadsheet shows worksheets only.',
   invalidFormula: "That formula isn't valid. Check its parentheses and quotes, or start with ' to enter it as text.",
   pasteTooLarge: 'That is too much to paste at once. Paste at most 200,000 cells.',
+  tableHeader: "Can't change a table's header or totals row here: the table keeps those names itself. Rename the column in a desktop spreadsheet app.",
   staleFormula: "Spreadsheet can't calculate this formula, so it shows the result saved in the file. Desktop spreadsheet apps recalculate it when they open the file."
 }
+
+/** An outside write changed what this tab's unsaved edits depended on, so they were set aside. */
+MESSAGES.mergeRefused = (cells) =>
+  `This file changed outside Orca while you had unsaved edits, in a way they can't merge into safely. ` +
+  `It now shows the new file; your ${cells === 1 ? 'edit to 1 cell is' : cells > 0 ? `edits to ${cells} cells are` : 'row and column changes are'} set aside.`
 
 const BINARY_FORMATS = { xls: 'Excel 97-2003 (.xls)', xlsb: 'Excel binary (.xlsb)' }
 

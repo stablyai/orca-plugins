@@ -52,6 +52,7 @@ const html = `<!doctype html>
 <div class="message" id="message" role="status"></div>
 <div class="workbook" id="workbook" hidden>
 <div class="notice" id="notice" role="note" hidden></div>
+<div class="notice conflict" id="conflict" role="alert" hidden><span id="conflict-text"></span><button type="button" class="notice-button" id="conflict-apply">Reapply at the same cells</button><button type="button" class="notice-button" id="conflict-discard">Discard them</button></div>
 <div class="detail-bar">
 <div class="address" id="address" title="Active cell"></div>
 <input class="formula" id="formula" type="text" spellcheck="false" autocomplete="off" aria-label="Cell contents">

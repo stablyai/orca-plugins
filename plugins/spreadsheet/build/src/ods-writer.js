@@ -242,7 +242,8 @@ function writeCell(element, model, keepFormula, calcext) {
     .join('')
   if (element.name === 'covered-table-cell' && !model) return `${tag}${kept}</${element.prefix}${element.name}>`
   let body = kept
-  if (model && model.v !== undefined && model.v !== null) {
+  // A result this editor could not calculate is left out, so the formula is computed on open.
+  if (model && model.v !== undefined && model.v !== null && !(model.f && model.$stale)) {
     switch (model.t) {
       case 'n':
         tag = setAttr(setAttr(setAttr(tag, 'office:value-type', 'float'), 'office:value', String(model.v)), 'calcext:value-type', 'float')
@@ -354,7 +355,7 @@ export function writeOds(pkg, source, ops, model) {
     if (modelSheet?.$recalculated) {
       modelSheet.data.forEach((row, r) =>
         row?.forEach((cell, c) => {
-          if (cell?.f && cell.$changed && !cells.get(r)?.has(c)) want(r, c, { model: cell, keepFormula: true })
+          if (cell?.f && (cell.$changed || cell.$stale) && !cells.get(r)?.has(c)) want(r, c, { model: cell, keepFormula: true })
         })
       )
     }

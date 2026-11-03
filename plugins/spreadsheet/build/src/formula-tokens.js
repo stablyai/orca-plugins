@@ -224,10 +224,18 @@ const FUTURE_FUNCTIONS = new Set([
   'SWITCH', 'TEXTJOIN', 'UNICHAR', 'UNICODE', 'UNIQUE', 'XLOOKUP', 'XMATCH', 'XOR'
 ])
 
-/** Formula text as the file stores it: `_xlfn.` added where Excel expects it. */
+/** Formula text with `;` argument separators, as some locales type them, written as commas. */
+export function normalizeSeparators(formula) {
+  const tokens = tokenize(formula)
+  for (const token of tokens) if (token.type === 'comma') token.text = ','
+  return untokenize(tokens)
+}
+
+/** Formula text as the file stores it: `,` between arguments, `_xlfn.` where Excel expects it. */
 export function toFileFormula(formula) {
   const tokens = tokenize(formula)
   for (const token of tokens) {
+    if (token.type === 'comma') token.text = ','
     if (token.type === 'func' && FUTURE_FUNCTIONS.has(token.name) && !/^_xlfn\./i.test(token.text)) {
       token.text = `_xlfn.${token.text}`
     }

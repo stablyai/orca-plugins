@@ -11,7 +11,7 @@ import { rangeToHtml, rangeToTsv, selectionStats } from './range-copy.js'
 import { parseTsv } from './tsv-paste.js'
 import { clampSelection, rangeCellCount } from './selection.js'
 import { applyOp } from './workbook-edits.js'
-import { createWorkbookCodec, modelOf, openSource, shiftBlocker } from './workbook-document.js'
+import { createWorkbookCodec, modelOf, openSource, shiftBlocker, touchesLockedCell } from './workbook-document.js'
 import { getCell } from './workbook-model.js'
 
 const GRID_FONT = '12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -32,6 +32,8 @@ const ui = {
   message: $('message'),
   workbook: $('workbook'),
   notice: $('notice'),
+  conflict: $('conflict'),
+  conflictText: $('conflict-text'),
   address: $('address'),
   formula: $('formula'),
   result: $('result'),
@@ -75,6 +77,8 @@ let undoStack = []
 let redoStack = []
 /** The cell being edited: `{ r, c, mode: 'enter' | 'edit', start }`, or null. */
 let editing = null
+/** This tab's edits an outside write kept from merging, until reapplied or discarded. */
+let rejected = null
 let noteTimer = 0
 let announceTimer = 0
 
@@ -127,6 +131,7 @@ function load(next) {
   activeIndex = -1
   undoStack = []
   redoStack = []
+  rejected = next.rejected?.length ? next.rejected : null
   if (result.status !== 'ok') {
     opened = null
     showMessage(MESSAGES[result.status])
@@ -143,6 +148,7 @@ function load(next) {
   ui.message.hidden = true
   ui.workbook.hidden = false
   renderNotice()
+  renderConflict()
   renderTabs()
   const keep = model.sheets.findIndex((sheet) => sheet.name === previousName)
   showSheet(keep >= 0 ? keep : Math.min(Math.max(previousIndex, 0), model.sheets.length - 1), keep >= 0)
@@ -153,6 +159,36 @@ function renderNotice() {
   ui.notice.hidden = text === ''
   ui.notice.textContent = text
   ui.formula.readOnly = !isEditable()
+}
+
+function renderConflict() {
+  ui.conflict.hidden = !rejected
+  if (!rejected) return
+  const cells = rejected.reduce((sum, op) => sum + (op.cells?.length ?? 0), 0)
+  ui.conflictText.textContent = MESSAGES.mergeRefused(cells)
+  announce(ui.conflictText.textContent)
+}
+
+/** Puts the edits an outside write kept from merging back on top of the new file, as asked. */
+function reapplyRejected() {
+  if (!rejected || !isEditable()) return
+  const ops = rejected
+  rejected = null
+  renderConflict()
+  let last = null
+  for (const op of ops) {
+    const inverse = applyOp(model, op)
+    undoStack.push({ op, inverse, sheet: op.sheet, selection: grid.state().selection })
+    last = op
+  }
+  redoStack = []
+  if (last) publish([...value.ops, ...ops], last)
+}
+
+function discardRejected() {
+  rejected = null
+  renderConflict()
+  grid.focus()
 }
 
 function renderTabs() {
@@ -282,11 +318,17 @@ function showNote(text) {
 
 /** Applies an operation, records it for undo and hands the new value to Orca. */
 function commit(op) {
+  if (op.type === 'cells' && touchesLockedCell(value.source, op.sheet, op.cells)) {
+    showNote(MESSAGES.tableHeader)
+    announce(MESSAGES.tableHeader)
+    return false
+  }
   const inverse = applyOp(model, op)
   undoStack.push({ op, inverse, sheet: op.sheet, selection: grid.state().selection })
   if (undoStack.length > 500) undoStack.shift()
   redoStack = []
   publish([...value.ops, op], op)
+  return true
 }
 
 function publish(ops, op) {
@@ -370,7 +412,7 @@ function clearSelection() {
       if (!isEmptyCell(row[c])) cells.push({ r, c, cell: null })
     }
   }
-  if (cells.length) commit({ type: 'cells', sheet: sheet.name, cells })
+  return cells.length ? commit({ type: 'cells', sheet: sheet.name, cells }) : false
 }
 
 /** Inserts or deletes the selected rows or columns. */
@@ -381,7 +423,10 @@ function shiftSelection(axis, where) {
   const count = axis === 'row' ? range.r1 - range.r0 + 1 : range.c1 - range.c0 + 1
   const first = axis === 'row' ? range.r0 : range.c0
   const span = where === 'delete' ? { at: first, count: -count } : { at: where === 'before' ? first : first + count, count }
-  const blocker = shiftBlocker(value.source, sheet, axis, span)
+  const limit = axis === 'row' ? 1_048_576 : 16_384
+  const used = axis === 'row' ? sheet.rowCount : sheet.columnCount
+  // As in Excel: nothing may be pushed past the last row or column.
+  const blocker = span.count > 0 && used + span.count > limit ? 'cells that would be pushed off the end of the sheet' : shiftBlocker(value.source, sheet, axis, span)
   if (blocker) {
     showNote(shiftBlockedMessage(axis, where === 'delete', blocker))
     announce(ui.note.textContent)
@@ -637,7 +682,7 @@ function onCopy(event) {
   const cells = rangeCellCount(range)
   if (cells <= MAX_HTML_COPY_CELLS) event.clipboardData.setData('text/html', rangeToHtml(range, getter, grid.merges()))
   if (event.type === 'cut' && isEditable()) {
-    clearSelection()
+    if (!clearSelection()) return
     showNote(`Cut ${countFormat.format(cells)} ${cells === 1 ? 'cell' : 'cells'}`)
   } else {
     showNote(`Copied ${countFormat.format(cells)} ${cells === 1 ? 'cell' : 'cells'}`)
@@ -670,7 +715,7 @@ function onPaste(event) {
       cells.push({ r, c, cell: 'error' in parsed ? { t: 's', v: typed, w: typed } : parsed.cell })
     }
   }
-  commit({ type: 'cells', sheet: sheet.name, cells })
+  if (!commit({ type: 'cells', sheet: sheet.name, cells })) return
   grid.dispatch({ type: 'cell', r: range.r0, c: range.c0 })
   grid.dispatch({ type: 'cell', r: range.r0 + height - 1, c: range.c0 + width - 1, extend: true }, 'corner')
   showNote(`Pasted ${countFormat.format(cells.length)} ${cells.length === 1 ? 'cell' : 'cells'}`)
@@ -710,6 +755,8 @@ function onDocumentKeyDown(event) {
   }
 }
 
+$('conflict-apply').addEventListener('click', reapplyRejected)
+$('conflict-discard').addEventListener('click', discardRejected)
 ui.tabs.addEventListener('keydown', onTabsKeyDown)
 document.addEventListener('keydown', onDocumentKeyDown, true)
 document.addEventListener('copy', onCopy)

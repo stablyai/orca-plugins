@@ -426,3 +426,31 @@ describe('read-only files', () => {
     await page.close()
   })
 })
+
+describe('outside writes', () => {
+  test('edits an outside write would misplace are set aside, then reapplied on request', async () => {
+    const book = (rows) => {
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Sheet1')
+      return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+    }
+    const { page, frame, errors } = await openEditor(browser)
+    await postFile(page, frame, book([['a', 1], ['b', 2]]), 'xlsx')
+    await frame.locator('[role="row"][aria-rowindex="3"] [role="gridcell"][aria-colindex="3"]').click()
+    await page.keyboard.type('20')
+    await page.keyboard.press('Enter')
+    await page.evaluate((base64) => window.__merge(base64), Buffer.from(book([['new', 0], ['a', 1], ['b', 2]])).toString('base64'))
+    await frame.locator('#conflict').waitFor()
+    assert.match(await text(frame, '#conflict-text'), /changed outside Orca .* your edit to 1 cell is set aside/)
+    assert.equal(await frame.locator('[role="row"][aria-rowindex="2"] [role="gridcell"][aria-colindex="2"]').innerText(), 'new')
+    assert.equal(await frame.locator('[role="row"][aria-rowindex="3"] [role="gridcell"][aria-colindex="3"]').innerText(), '1')
+    await screenshot(page, 'merge-set-aside')
+    await frame.locator('#conflict-apply').click()
+    assert.equal(await frame.locator('#conflict').isVisible(), false)
+    assert.equal(await frame.locator('[role="row"][aria-rowindex="3"] [role="gridcell"][aria-colindex="3"]').innerText(), '20')
+    const saved = XLSX.read(await savedFile(page), { dense: true }).Sheets.Sheet1['!data']
+    assert.deepEqual(saved.map((r) => r.map((c) => c?.v)), [['new', 0], ['a', 20], ['b', 2]])
+    assert.deepEqual(errors.map(String), [])
+    await page.close()
+  })
+})

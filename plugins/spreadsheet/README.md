@@ -22,8 +22,11 @@ validation rules, hyperlinks and named ranges follow the rows and columns they p
 Excel; a reference to a deleted cell becomes `#REF!`.
 
 Orca keeps the file: edits mark the tab unsaved and Orca's save writes them. When an agent or
-another app changes the file while you have unsaved edits, the two are merged: your edits win on
-the cells you changed and everything else comes from the new file.
+another app changes the file while you have unsaved edits, they are merged only when that is
+clearly safe: the outside change left every sheet's size and merged cells alone and touched no row
+or column you edited, and you only changed cell contents. Otherwise the tab shows the new file and
+sets your edits aside, with a choice to reapply them at the same cells or discard them, so nothing
+lands on rows that moved underneath it.
 
 Saving changes only what you edited. Styles, column widths, charts, pictures, comments, macros and
 every other part of the file keep their exact bytes, so the file opens in Excel exactly as before
@@ -33,7 +36,9 @@ Formulas recalculate as you type, for arithmetic, comparisons, text joins, refer
 common functions (`SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `COUNTA`, `COUNTIF`, `SUMIF`, `IF`,
 `IFERROR`, `AND`, `OR`, `ROUND`, `CONCAT`, `LEFT`, `MID`, `LEN` and more). A formula that uses
 anything else keeps the result saved in the file (hover the result for a note), and the saved file
-asks Excel to recalculate every formula when it opens.
+asks Excel to recalculate every formula when it opens. A formula it can't calculate (array
+formulas included) is saved without a result, so the next desktop spreadsheet app to open it computes it rather
+than show an outdated one. Formulas typed with `;` between arguments are saved with commas.
 
 ## Read-only files
 
@@ -73,7 +78,10 @@ tab-separated text fills cells from the active one; a single value fills the who
 - **Cell contents only.** Fonts, colours, borders and number formats are kept but cannot be changed
   here; new cells use the default style.
 - **Row and column changes stop** on a sheet whose charts, pictures, comments, tables, pivot tables
-  or similar would end up in the wrong place; the status bar says why. `.ods` files also refuse a
+  or similar would end up in the wrong place, or that a chart, pivot table, sparkline or rule on
+  another sheet reads; the status bar says why.
+- **Excel tables:** header and totals cells can't be edited here, because the table keeps those
+  names itself. `.ods` files also refuse a
   row or column change through merged cells. Edit those sheets' cells freely, or make the change
   in a desktop spreadsheet app.
 - **Sheets** cannot be added, renamed or deleted yet. Hidden sheets are left out (the tab bar counts

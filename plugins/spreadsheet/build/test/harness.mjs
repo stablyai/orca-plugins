@@ -53,6 +53,7 @@ const ORCA_SHIM = `(function () {
       var version = doc.version
       var readOnly = doc.readOnly
       var value = o.decode(doc.content)
+      var base = value
       var timer = null
       var replaced = []
       function send() {
@@ -70,7 +71,17 @@ const ORCA_SHIM = `(function () {
       })
       window.addEventListener('message', function (event) {
         var m = event.data
-        if (event.source === window.parent && m && m.orca === 1 && m.event === 'test.flush' && timer !== null) send()
+        if (event.source !== window.parent || !m || m.orca !== 1) return
+        if (m.event === 'test.flush' && timer !== null) send()
+        // A disk write under unsaved edits, as Orca hands it to a session with merge.
+        if (m.event === 'test.merge') {
+          clearTimeout(timer)
+          timer = null
+          version = m.payload.version
+          value = o.merge(base, o.decode(m.payload.content), value)
+          base = o.decode(m.payload.content)
+          replaced.forEach(function (fn) { fn(value) })
+        }
       })
       return {
         get value() { return value },
@@ -137,6 +148,12 @@ window.__post = (payload) => document.getElementById('editor').contentWindow.pos
   '*'
 )
 window.__version = 0
+window.__merge = (base64, version = ++window.__version) => {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  document.getElementById('editor').contentWindow.postMessage({ orca: 1, kind: 'evt', event: 'test.merge', payload: { version, content: { kind: 'bytes', bytes: bytes.buffer } } }, '*', [bytes.buffer])
+}
 window.__flush = () => document.getElementById('editor').contentWindow.postMessage({ orca: 1, kind: 'evt', event: 'test.flush' }, '*')
 window.__postBytes = (base64, fileType, version = ++window.__version, readOnly = false) => {
   const binary = atob(base64)

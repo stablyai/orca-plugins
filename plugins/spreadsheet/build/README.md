@@ -60,8 +60,10 @@ XML, so a save changes only what was edited:
   makes Excel repair the file. Every other part, macros included, keeps its compressed bytes.
 - Row and column changes move references in every formula, merged cells, column widths,
   conditional formats, validation, hyperlinks, selections, page breaks and defined names. A sheet
-  with parts the writer does not move (drawings, comments, tables, pivot tables, `extLst`, …) or
-  that a chart or pivot cache reads refuses them (`xlsxShiftBlocker`).
+  with parts the writer does not move (drawings, comments, tables, pivot tables, `extLst`, any
+  linked part but hyperlinks and printer settings), or that a chart, pivot cache, table formula or
+  another sheet's extensions (sparklines, newer rules) read, refuses them (`xlsxShiftBlocker`).
+  Header and totals cells of Excel tables refuse edits (`xlsxLockedRanges`).
 - `.ods` (`src/ods-writer.js`): only `content.xml` is rewritten, and in it only the edited cells,
   splitting repeated rows and cells as needed. Formulas are kept in OpenDocument form and converted
   to Excel's spelling for display (`src/formula-odf.js`). Row and column changes adjust repeat
@@ -72,7 +74,8 @@ XML, so a save changes only what was edited:
 
 Formulas recalculate as cells change (`src/formula-eval.js`, `recalculate` in
 `src/workbook-edits.js`): only formulas that read a changed cell, directly or through others. A
-formula with a function the calculator lacks keeps its saved result.
+formula with a function the calculator lacks, or an array formula, keeps showing its saved result
+(marked stale) and is saved without one, so the next desktop spreadsheet app to open it computes it.
 
 `test/workbook-writers.test.mjs` checks what changes and that every other part keeps its bytes,
 against hand-written workbooks (`scripts/styled-fixture.mjs`) with styles, shared strings and
@@ -114,8 +117,11 @@ chromium-headless-shell` if it is missing). Set `SPREADSHEET_SCREENSHOTS=<dir>` 
 keeps the buffer, dirty state and saving, flushes the editor before a save, and hands over outside
 changes. `decode` only wraps the bytes; parsing waits for the grid. `encode` replays the log, and
 remembers what it encoded, so decoding Orca's copy of an accepted edit gives that value back
-instead of parsing the file again. `merge(base, outside, mine)` replays the operations this tab made
-since `base` onto `outside`.
+instead of parsing the file again. `merge(base, outside, mine)` replays this tab's cell edits since
+`base` onto `outside` only when that is clearly safe: no row or column change on this side, and on
+the outside no sheet changed, no sheet changed its used size or merges, and no row or column this
+tab edited changed. Otherwise it returns `outside` with the edits in `rejected`, and the editor
+offers to reapply them at the same cells or discard them.
 
 The editor commits an open cell edit on `editor.flush` (registered before the session's handler),
 on the save shortcut and on `pagehide`, so a save includes what is being typed.

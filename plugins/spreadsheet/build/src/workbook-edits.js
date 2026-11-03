@@ -27,6 +27,11 @@ export function portableOp(op) {
   return op.restore ? { ...op, restore: { ...op.restore, cells: op.restore.cells.map((entry) => ({ ...entry, cell: copyCell(entry.cell) })) } } : op
 }
 
+/** An operation's own copy of a cell, so later edits to the model never reach it. */
+function snapshot(cell) {
+  return cell ? { ...cell } : null
+}
+
 function applyCells(model, op) {
   const sheet = findSheet(model, op.sheet)
   if (!sheet) return { type: 'cells', sheet: op.sheet, cells: [] }
@@ -34,10 +39,12 @@ function applyCells(model, op) {
   const changed = []
   const seeds = []
   let shrank = false
-  for (const { r, c, cell } of op.cells) {
+  for (const { r, c, cell: given } of op.cells) {
     const row = sheet.data[r]
     const previous = row?.[c] ?? null
-    inverse.push({ r, c, cell: previous })
+    inverse.push({ r, c, cell: snapshot(previous) })
+    // A copy goes into the model: later shifts and recalculation change it, never the operation.
+    const cell = snapshot(given)
     if (cell) {
       ;(sheet.data[r] ??= [])[c] = cell
       sheet.rowCount = Math.max(sheet.rowCount, r + 1)
@@ -91,7 +98,7 @@ function applyShift(model, op) {
     if (op.at < sheet.data.length) {
       if (removed) {
         sheet.data.splice(op.at, removed).forEach((row, index) => {
-          row?.forEach((cell, c) => cell && cells.push({ r: op.at + index, c, cell }))
+          row?.forEach((cell, c) => cell && cells.push({ r: op.at + index, c, cell: snapshot(cell) }))
         })
       } else {
         sheet.data.splice(op.at, 0, ...new Array(op.count))
@@ -101,7 +108,7 @@ function applyShift(model, op) {
     sheet.data.forEach((row, r) => {
       if (!row || op.at >= row.length) return
       if (removed) {
-        row.splice(op.at, removed).forEach((cell, index) => cell && cells.push({ r, c: op.at + index, cell }))
+        row.splice(op.at, removed).forEach((cell, index) => cell && cells.push({ r, c: op.at + index, cell: snapshot(cell) }))
       } else {
         row.splice(op.at, 0, ...new Array(op.count))
       }
@@ -122,7 +129,7 @@ function applyShift(model, op) {
     .filter(Boolean)
 
   if (op.restore) {
-    for (const { r, c, cell } of op.restore.cells) (sheet.data[r] ??= [])[c] = cell
+    for (const { r, c, cell } of op.restore.cells) (sheet.data[r] ??= [])[c] = snapshot(cell)
     sheet.merges = op.restore.merges.slice()
     info.splice(0, info.length, ...op.restore.info)
     for (const entry of op.restore.formulas) {
@@ -132,7 +139,7 @@ function applyShift(model, op) {
       if (entry.F !== undefined) cell.F = entry.F
       seeds.push(cell)
     }
-    for (const { cell } of op.restore.cells) if (cell.f) seeds.push(cell)
+    for (const { r, c } of op.restore.cells) if (sheet.data[r][c].f) seeds.push(sheet.data[r][c])
   }
   measureExtent(sheet)
   sheet.$edited = true
@@ -262,6 +269,8 @@ export function recalculate(model, changed, seeds = []) {
     busy.add(cell)
     let value
     try {
+      // Array formulas spill or loop over ranges; this calculator only does single values.
+      if (cell.F) throw new Unsupported('array formula')
       const tree = formulaTree(cell)
       if (!tree) throw new Unsupported('unreadable')
       value = evaluateFormula(tree, hostOf.get(cell).name, resolver)
@@ -285,6 +294,7 @@ export function recalculate(model, changed, seeds = []) {
       if (!(error instanceof Unsupported)) throw error
       continue
     }
+    if (cell.$stale) hostOf.get(cell).$recalculated = true
     if (value === undefined) continue
     const before = `${cell.t}:${cell.v}`
     storeResult(cell, value)

@@ -94,3 +94,16 @@ test('the codec saves the original bytes when nothing is left to apply', () => {
   const value = codec.decode({ kind: 'bytes', bytes: bytes.slice().buffer })
   assert.deepEqual(new Uint8Array(codec.encode(value).bytes), bytes)
 })
+
+test('an outside write that moves rows sets this tab’s edits aside instead of misplacing them', async () => {
+  const doc = await open(workbookWith([['a', 1], ['b', 2]]))
+  const replaced = []
+  doc.onReplace((value) => replaced.push(value.rejected?.length ?? 0))
+  host.conflictNext(workbookWith([['new', 0], ['a', 1], ['b', 2]]))
+  type(doc, 'Sheet1', 'B2', '20')
+  await host.flush().catch(() => {})
+  assert.deepEqual(replaced, [1])
+  assert.equal(saved(host.bytes, 'Sheet1', 'A1'), 'new')
+  assert.equal(saved(host.bytes, 'Sheet1', 'B2'), 1, 'b’s old row is untouched')
+  assert.equal(saved(host.bytes, 'Sheet1', 'B3'), 2)
+})

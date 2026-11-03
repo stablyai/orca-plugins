@@ -5,7 +5,7 @@
 import { cellAddress } from './address.js'
 import { mapIndex, planEdits } from './edit-plan.js'
 import { shiftFormula, shiftSpan, shiftSqref } from './formula-shift.js'
-import { toFileFormula } from './formula-tokens.js'
+import { columnIndex, toFileFormula } from './formula-tokens.js'
 import { readBook, readRels, relsPathOf } from './xlsx-parts.js'
 import { escapeXml, findElement, findElements, getAttr, replaceElements, setAttr, unescapeXml, utf8 } from './xml-text.js'
 import { writeZip } from './zip-archive.js'
@@ -60,16 +60,69 @@ export function xlsxShiftBlocker(pkg, sheetName, axis) {
   }
   if (/<(?:[\w.-]+:)?f\b[^>]*\bt="dataTable"/.test(xml)) return 'a data table'
   if (axis === 'column' && /<(?:[\w.-]+:)?filterColumn\b/.test(xml)) return 'a column filter'
-  // Charts and pivot tables elsewhere in the workbook can point at this sheet's cells.
-  const quoted = new RegExp(`(^|[^\\w.])(${escape(sheetName)}|'${escape(sheetName.replace(/'/g, "''"))}')!`, 'i')
+  // Parts linked to the sheet (pivot tables, tables, drawings, comments…) hold cell positions this
+  // writer does not move; only hyperlink targets and printer settings are safe.
+  for (const rel of readRels(pkg.files, sheet.path)) {
+    if (rel.type !== 'hyperlink' && rel.type !== 'printerSettings') return REL_LABELS[rel.type] ?? 'linked parts'
+  }
+  const reference = new RegExp(`(^|[^\\w.])(${escape(sheetName)}|'${escape(sheetName.replace(/'/g, "''"))}')!`, 'i')
   for (const part of pkg.entries) {
-    if (!/^xl\/(charts\/chart|pivotCache\/pivotCacheDefinition|pivotTables\/)/.test(part.name)) continue
-    const text = unescapeXml(utf8.decode(part.data))
-    if (part.name.includes('pivotCache') ? new RegExp(`sheet="${escape(sheetName)}"`, 'i').test(text) || quoted.test(text) : quoted.test(text)) {
-      return part.name.includes('chart') ? 'a chart that reads this sheet' : 'a pivot table that reads this sheet'
+    if (!part.name.startsWith('xl/') || !part.name.endsWith('.xml') || part.name === sheet.path) continue
+    if (/^xl\/(workbook|styles|sharedStrings|calcChain)\.xml$|^xl\/theme\/|\/_rels\//.test(part.name)) continue
+    let text = utf8.decode(part.data)
+    if (part.name.startsWith('xl/pivotCache/')) {
+      // A cache reads its source by sheet name, or by a defined name this check cannot resolve.
+      const source = findElement(text, 'worksheetSource')
+      if (source && (getAttr(source.startTag, 'name') || (getAttr(source.startTag, 'sheet') ?? '').toUpperCase() === sheetName.toUpperCase())) {
+        return 'a pivot table that reads this sheet'
+      }
+    }
+    // Other sheets' own cells move with the model; their extensions (sparklines, newer rules) do not.
+    if (pkg.book.sheets.some((other) => other.path === part.name)) text = findElements(text, 'extLst').map((element) => element.inner).join('')
+    if (reference.test(unescapeXml(text))) {
+      if (part.name.startsWith('xl/charts/')) return 'a chart that reads this sheet'
+      if (part.name.startsWith('xl/pivot')) return 'a pivot table that reads this sheet'
+      if (part.name.startsWith('xl/tables/')) return 'a table formula that reads this sheet'
+      return 'sparklines or rules on another sheet that read this one'
     }
   }
   return null
+}
+
+/**
+ * The cells of this sheet an edit must not change: each Excel table's header and totals rows,
+ * whose text the table's own part repeats. `{ r0, c0, r1, c1 }` ranges, zero-based.
+ */
+export function xlsxLockedRanges(pkg, sheetName) {
+  const sheet = pkg.book.sheets.find((entry) => entry.name.toUpperCase() === sheetName.toUpperCase())
+  if (!sheet) return []
+  const ranges = []
+  for (const rel of readRels(pkg.files, sheet.path)) {
+    if (rel.type !== 'table') continue
+    const part = pkg.files.get(rel.target)
+    const table = part && findElement(utf8.decode(part.data), 'table')
+    const ref = table && getAttr(table.startTag, 'ref')
+    const match = ref && /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/i.exec(ref)
+    if (!match) continue
+    const [r0, c0, r1, c1] = [Number(match[2]) - 1, columnIndex(match[1]), Number(match[4]) - 1, columnIndex(match[3])]
+    const header = Number(getAttr(table.startTag, 'headerRowCount') ?? 1)
+    const totals = Number(getAttr(table.startTag, 'totalsRowCount') ?? 0)
+    if (header > 0) ranges.push({ r0, c0, r1: r0 + header - 1, c1 })
+    if (totals > 0) ranges.push({ r0: r1 - totals + 1, c0, r1, c1 })
+  }
+  return ranges
+}
+
+const REL_LABELS = {
+  pivotTable: 'a pivot table',
+  table: 'tables',
+  drawing: 'charts, pictures or shapes',
+  vmlDrawing: 'comments or notes',
+  comments: 'comments or notes',
+  threadedComment: 'comments or notes',
+  oleObject: 'embedded objects',
+  control: 'form controls',
+  ctrlProp: 'form controls'
 }
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -272,7 +325,7 @@ function keptCell(cell, r, c, context, p) {
   if (!formula) return cell.empty ? startTag : `${startTag}${cell.inner}</${p}c>`
   const model = context.modelSheet.data[r]?.[c]
   const shared = getAttr(formula.startTag, 't') === 'shared'
-  if (!model?.f || (!context.structural && !shared && !model.$changed)) {
+  if (!model?.f || (!context.structural && !shared && !model.$changed && !model.$stale)) {
     return `${startTag}${cell.inner}</${p}c>`
   }
   let fTag = setAttr(setAttr(formula.startTag, 'si', null), 't', shared ? null : getAttr(formula.startTag, 't'))
@@ -281,7 +334,9 @@ function keptCell(cell, r, c, context, p) {
   fTag = fTag.replace(/\s*\/>$/, '>')
   // Kept text when nothing moved and it was written out: the file's own spelling of the formula.
   const text = !context.structural && !shared && !formula.empty ? formula.inner : escapeXml(fileFormula(model.f))
-  return valueCell(model, setAttr(setAttr(setAttr(startTag, 'cm', null), 'vm', null), 't', null), `${fTag}${text}</${p}f>`, p)
+  // Dynamic arrays keep their cell metadata while the formula stays an array formula.
+  const metadata = getAttr(fTag, 't') === 'array' ? startTag : setAttr(startTag, 'cm', null)
+  return valueCell(model, setAttr(setAttr(metadata, 'vm', null), 't', null), `${fTag}${text}</${p}f>`, p)
 }
 
 function fileFormula(f) {
@@ -306,7 +361,8 @@ function newCell(cell, r, c, previousTag, p) {
 
 function valueCell(cell, startTag, formula, p) {
   const tag = (type) => (type ? setAttr(startTag, 't', type) : startTag)
-  if (cell.v === undefined || cell.v === null) return `${tag(null)}${formula}</${p}c>`
+  // A result this editor could not calculate is left out, so Excel computes it on open.
+  if (cell.v === undefined || cell.v === null || (formula && cell.$stale)) return `${tag(null)}${formula}</${p}c>`
   switch (cell.t) {
     case 'b':
       return `${tag('b')}${formula}<${p}v>${cell.v ? 1 : 0}</${p}v></${p}c>`
@@ -361,6 +417,7 @@ function shiftSheetParts(xml, context) {
         if (!next) return name === 'selection' ? setAttr(setAttr(startTag, 'sqref', 'A1'), 'activeCell', 'A1') : ''
         startTag = setAttr(startTag, attr, next)
       }
+      if (name === 'hyperlink' && getAttr(startTag, 'location')) startTag = setAttr(startTag, 'location', formulas(getAttr(startTag, 'location')))
       if (name === 'selection') {
         const active = getAttr(startTag, 'activeCell')
         if (active) startTag = setAttr(startTag, 'activeCell', sqref(active) || 'A1')
