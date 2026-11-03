@@ -3,13 +3,13 @@
   "id": "orca-sqlite-browser",
   "publisher": "stablyai",
   "name": "SQLite Browser",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "execution": "sandboxed-ui",
-  "description": "Browse SQLite databases in Orca's editor: every table and view, its schema, and millions of rows, read-only.",
+  "description": "Browse and query SQLite databases in Orca's editor: tables, views and schema, SQL queries, column filters and sorting, copy and CSV export. Read-only.",
   "license": "MIT",
   "repository": "https://github.com/stablyai/orca-plugins/tree/main/plugins/sqlite-browser",
   "engines": {
-    "orca": ">=1.4.245"
+    "orca": ">=1.4.248"
   },
   "contributes": {
     "customEditors": [
@@ -24,9 +24,26 @@
         ],
         "entry": "editor/index.html",
         "priority": "default",
-        "contentKind": "bytes"
+        "contentKind": "bytes",
+        "frame": "isolated"
       }
     ]
   },
-  "capabilities": []
+  "capabilities": [],
+  "cover": {
+    "path": "images/cover.png",
+    "alt": "A music database in Orca: tracks sorted by length, filtered to lyrics with night, and the selected cell's full text below the grid"
+  },
+  "screenshots": [
+    {
+      "path": "images/query.png",
+      "alt": "A SQL query over the tracks table, its rows sorted by length and filtered by title, in a light theme",
+      "caption": "Query, sort and filter"
+    },
+    {
+      "path": "images/schema.png",
+      "alt": "The schema page listing the CREATE statement of every table, view, index and trigger",
+      "caption": "Every table, view, index and trigger"
+    }
+  ]
 }

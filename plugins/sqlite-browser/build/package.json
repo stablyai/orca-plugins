@@ -1,0 +1,15 @@
+{
+  "name": "orca-sqlite-browser-editor-build",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test 'test/*.test.mjs'"
+  },
+  "dependencies": {
+    "sql.js": "1.15.2"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

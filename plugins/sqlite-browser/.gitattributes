@@ -1,0 +1,4 @@
+# Built by build/build.mjs.
+editor/** linguist-generated=true -diff
+THIRD_PARTY_NOTICES.txt linguist-generated=true
+build/test/orca-testing/** linguist-generated=true -diff
