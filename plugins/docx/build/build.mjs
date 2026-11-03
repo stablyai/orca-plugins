@@ -68,16 +68,19 @@ const html = `<!doctype html>
 <body>
 <style id="fonts"></style>
 <div class="app">
+<div class="find-bar" id="find-bar" role="search" hidden><input id="find" type="text" placeholder="Find in document" aria-label="Find in document" autocomplete="off" spellcheck="false"><span id="find-count" class="find-count" aria-live="polite"></span><button id="find-prev" type="button" title="Previous match (Shift+Enter)" aria-label="Previous match">↑</button><button id="find-next" type="button" title="Next match (Enter)" aria-label="Next match">↓</button><button id="close-find" type="button" title="Close (Escape)" aria-label="Close find">×</button></div>
 <div class="content">
 <div class="viewport" id="viewport" tabindex="0" aria-label="Word document preview"><div class="pages" id="pages"></div></div>
 <div class="message" id="message" role="status"></div>
 </div>
-<div class="link-bar" id="link-bar" hidden><label for="link">Copy link address</label><input id="link" readonly aria-label="Link address"><button id="close-link" type="button" aria-label="Close link address">×</button></div>
+<div class="link-bar" id="link-bar" hidden><label for="link" id="link-label">Copy link address</label><input id="link" readonly aria-label="Link address"><button id="close-link" type="button" aria-label="Close link address">×</button></div>
 <div class="footer">
 <button id="out" type="button" title="Zoom out" aria-label="Zoom out">−</button>
 <button id="fit" type="button" title="Fit to width" aria-label="Fit to width">Fit</button>
 <button id="in" type="button" title="Zoom in" aria-label="Zoom in">+</button>
 <span id="percent" class="percent">100%</span>
+<button id="open-find" type="button" title="Find in document" aria-label="Find in document">Find</button>
+<button id="markup" type="button" title="Show tracked changes and comments" aria-label="Show tracked changes and comments" hidden>Markup</button>
 <span class="label">Word document · Read only</span>
 <span id="count" class="page-count" aria-live="polite"></span>
 </div>
