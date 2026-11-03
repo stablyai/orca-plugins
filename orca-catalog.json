@@ -676,8 +676,8 @@
       "releases": [
         {
           "version": "2.0.0",
-          "commit": "1bfc3c2bb7334a3af0152e8455feda767091b8c3",
-          "contentHash": "bd4ac696ffca83286c15ce74215c94e27171638a5c32c3b5bf4fa5d1d044bf81",
+          "commit": "41c90dba9bfd84e2b8dec55f5daed8ab40e79acc",
+          "contentHash": "3c914a4724d61994fa0a33d751f108e746cd928b54695845f869f212fda20ebc",
           "execution": "sandboxed-ui",
           "minimumOrca": "1.4.248",
           "changelog": "Editing: cell values and formulas, inserting and deleting rows and columns, clearing, paste, and undo and redo. Saves .xlsx, .xlsm and .ods in place, changing only what was edited, so styles, charts, comments and macros are kept. Formulas recalculate for common functions, and outside writes merge with unsaved edits. .xls and .xlsb open read-only. Needs Orca 1.4.248.",
@@ -705,7 +705,7 @@
           ],
           "images": {
             "cover": {
-              "path": "plugins/spreadsheet/images/cover.png",
+              "path": "plugins/spreadsheet/images/editing-cover.png",
               "alt": "A quarterly summary workbook being edited: East's revenue changed and the totals recalculated, and a formula typed into a new Target column",
               "sha256": "9b9d7be4eed1fd0c1a7e743fb718d6227661ee4dd1b7813a720c512fcc342f6a",
               "width": 1600,
@@ -720,14 +720,14 @@
                 "height": 1000
               },
               {
-                "path": "plugins/spreadsheet/images/sheets.png",
+                "path": "plugins/spreadsheet/images/large-sheet.png",
                 "alt": "A 50,000-row data sheet with a block of cells selected and its count, sum and average in the status bar",
                 "sha256": "138c43ecd911f630b89d5290f9fb28fcefd33068bc38dcc8e8a351eef28887bd",
                 "width": 1600,
                 "height": 1000
               },
               {
-                "path": "plugins/spreadsheet/images/dark.png",
+                "path": "plugins/spreadsheet/images/editing-dark.png",
                 "alt": "The summary workbook in Orca's dark theme after an edit, with the changed revenue, recalculated totals and a #DIV/0! error in red",
                 "sha256": "b7fdb8e3e2604e015b9a6e5af00d3d7b69d8eea810ad76ba6f7bbe8482b00b39",
                 "width": 1600,
