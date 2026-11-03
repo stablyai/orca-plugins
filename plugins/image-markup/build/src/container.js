@@ -402,6 +402,35 @@ export function withPendingMark(format, bytes) {
   return null
 }
 
+/** `bytes` without any stand-in note, so a note that reached disk is not kept by later saves. */
+export function withoutPendingMark(format, bytes) {
+  if (format === 'png') {
+    const chunks = pngChunks(bytes)
+    const notes = chunks?.filter((chunk) => chunk.type === PENDING_CHUNK) ?? []
+    return notes.length ? cut(bytes, notes) : bytes
+  }
+  if (format === 'jpeg') {
+    const segments = jpegSegments(bytes)?.segments ?? []
+    const notes = segments.filter((segment) => isSkippedSegment(bytes, segment) && !isOurSegment(bytes, segment))
+    return notes.length ? cut(bytes, notes) : bytes
+  }
+  return bytes
+}
+
+/** `bytes` with the given { start, end } ranges, in order, removed. */
+function cut(bytes, ranges) {
+  const out = new Uint8Array(bytes.length - ranges.reduce((sum, range) => sum + range.end - range.start, 0))
+  let at = 0
+  let from = 0
+  for (const range of ranges) {
+    out.set(bytes.subarray(from, range.start), at)
+    at += range.start - from
+    from = range.end
+  }
+  out.set(bytes.subarray(from), at)
+  return out
+}
+
 /** Byte equality, comparing 4 bytes at a time when both views are aligned. */
 export function sameBytes(a, b) {
   if (a === b) return true

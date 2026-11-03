@@ -8,14 +8,15 @@
 // into a file is asynchronous (the editor does it before `change`), so `encode` only hands over
 // `file`. A merge that moved markup onto a new image can't encode, so it returns `stale: true`
 // with the outside file; the editor encodes it and sends the result as its next change.
-import { SAVABLE_FORMATS, detectFormat, imageSize, readMarkup, sameBytes } from './container.js'
+import { SAVABLE_FORMATS, detectFormat, imageSize, readMarkup, sameBytes, withoutPendingMark } from './container.js'
 import { parseScene, renumberSteps, serializeScene } from './scene.js'
 
 /** A file's bytes as a value; a file this plugin did not write is an original with no shapes. */
 export function decodeImage(content) {
   const file = new Uint8Array(content.bytes)
   const format = detectFormat(file)
-  const plain = { file, format, original: file, shapes: [], hadMarkup: false }
+  // A stand-in's note that reached disk is no part of the image: Clear all must not keep it.
+  const plain = { file, format, original: withoutPendingMark(format, file), shapes: [], hadMarkup: false }
   if (!SAVABLE_FORMATS.has(format)) return plain
   let markup = null
   try {
@@ -29,7 +30,8 @@ export function decodeImage(content) {
   const shapes = size && parseScene(markup.scene, size[0], size[1])
   if (!shapes) return plain
   const redraw = markup.scene.redraw === true
-  return { file, format, original: markup.original.slice(), shapes, hadMarkup: shapes.length > 0, size, redraw }
+  const original = withoutPendingMark(format, markup.original.slice())
+  return { file, format, original, shapes, hadMarkup: shapes.length > 0, size, redraw }
 }
 
 const exactBuffer = (bytes) =>

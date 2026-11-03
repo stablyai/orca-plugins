@@ -9,7 +9,7 @@
 // The file is only written through Orca's document session: edits are debounced, encoded off the
 // main thread, and handed over as the whole new file (see container.js for the format); Orca
 // keeps it dirty, saves it on ⌘S, and merges writes from outside (see document-sync.js).
-import { SAVABLE_FORMATS, imageSize, withPendingMark, withPngDensity, writeMarkup } from './container.js'
+import { SAVABLE_FORMATS, imageSize, readMarkup, withPendingMark, withPngDensity, writeMarkup } from './container.js'
 import { mergeImages, openImageSession, sameFile } from './document-sync.js'
 import {
   TEXT_LINE_HEIGHT,
@@ -485,12 +485,18 @@ function markPending() {
   doc.change({ ...s.base, shapes: s.shapes, file, pending: true })
 }
 
-/** The last file with `shapes` inside it, or with just a note when they hold a redaction. */
+/**
+ * The last file with `shapes` inside it, or with just a note when that is too large. With a
+ * redaction, the stand-in adds nothing the last file doesn't hold: its own original, and no shape
+ * drawn before the last redaction, which a save burns in. Reopened, the redaction is applied again.
+ */
 function standInFile(shapes) {
-  // The original goes in only where a real save would put it too: never under a redaction.
-  if (shapes.length && !shapes.some((shape) => shape.t === 'redact')) {
-    const scene = { ...serializeScene(shapes, s.width, s.height), redraw: true }
-    const file = writeMarkup(s.format, s.base.file, s.original, scene)
+  if (shapes.length) {
+    const last = shapes.findLastIndex((shape) => shape.t === 'redact')
+    const kept = last < 0 ? shapes : shapes.filter((shape, i) => shape.t === 'redact' || i > last)
+    const original = last < 0 ? s.original : (readMarkup(s.base.file)?.original ?? s.base.file)
+    const scene = { ...serializeScene(kept, s.width, s.height), redraw: true }
+    const file = writeMarkup(s.format, s.base.file, original, scene)
     if (file.byteLength <= MAX_DOCUMENT_BYTES) return file
   }
   return withPendingMark(s.format, s.base.file)
@@ -745,7 +751,7 @@ async function load(value, { outside = false } = {}) {
   let original = value.original
   let shapes = value.shapes
   try {
-    if (value.original !== value.file) {
+    if (value.size) {
       // Only this plugin ever decodes the original inside, so its header must vouch for its size.
       bitmap = await decode(value.original, { requireSize: true }).catch(() => null)
       // The scene's size, which is the shown size: an EXIF-rotated JPEG swaps its header's sides.
@@ -773,8 +779,9 @@ async function load(value, { outside = false } = {}) {
 
   const sameSize = s.bitmap && s.width === bitmap.width && s.height === bitmap.height
   const keptMarkup = value.stale === true
-  // A saved stand-in: its shapes are right but its pixels are not, so encode it again.
-  const redraw = !keptMarkup && value.redraw === true && shapes.length > 0
+  // A saved stand-in: its shapes are right but its pixels are not. Encode it again at once only
+  // when it holds a redaction the pixels don't show yet; otherwise with the next edit.
+  const redraw = !keptMarkup && value.redraw === true && shapes.some((shape) => shape.t === 'redact')
   s.bitmap?.close()
   for (const mip of s.mips) if (mip instanceof ImageBitmap) mip.close()
   const base = keptMarkup ? { ...value, shapes: [] } : value
@@ -789,7 +796,7 @@ async function load(value, { outside = false } = {}) {
     width: bitmap.width,
     height: bitmap.height,
     shapes,
-    loaded: keptMarkup ? [] : shapes,
+    loaded: keptMarkup || redraw ? [] : shapes,
     // A merge still has to be encoded and sent, so it doesn't count as posted.
     posted: keptMarkup || redraw ? null : shapes,
     // A redraw needs no stand-in: the file already holds these shapes.

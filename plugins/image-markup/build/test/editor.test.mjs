@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
-import { crc32, detectFormat, readMarkup, sameBytes, writeMarkup } from '../src/container.js'
+import { crc32, detectFormat, readMarkup, sameBytes, withPendingMark, writeMarkup } from '../src/container.js'
 import { drag, edits, imageSizeOf, isPending, launch, makeImage, openEditor, pagePoint, pixel, postBytes, postImage } from './harness.mjs'
 
 const SIZE = [640, 400]
@@ -361,18 +361,71 @@ for (const [format, imageOptions, post] of [
     assert.ok(markup, 'the markup is still readable')
     assert.ok(sameBytes(markup.original, image), 'and the original is still inside')
     assert.deepEqual(markup.scene.shapes.map((shape) => shape.t), ['box'])
-    // Reopened, the shapes are there, and the stale pixels are redrawn as an unsaved edit.
+    // Reopened, the shapes are there; just viewing it sends nothing, and the next edit redraws it.
     const reopened = await openEditor(browser)
     await postImage(reopened.page, reopened.frame, standIn, post)
     assert.equal(await info(reopened.frame), `640 × 400 · ${format} · 1 mark`)
-    await until(async () => (await edits(reopened.page)).length === 1)
-    const redrawn = (await edits(reopened.page))[0]
+    await reopened.page.waitForTimeout(600)
+    assert.equal((await edits(reopened.page, { pending: true })).length, 0, 'opening it does not dirty the tab')
+    await drag(reopened.page, reopened.frame, SIZE, [[500, 50], [600, 80]])
+    assert.equal(await flush(reopened.page), null)
+    const redrawn = (await edits(reopened.page)).at(-1)
     assert.ok(near(await pixel(reopened.page, redrawn, 100, 200), RED, 40), 'the box is in the pixels now')
     assert.ok(sameBytes(readMarkup(redrawn).original, image))
     assert.deepEqual([...errors, ...reopened.errors], [])
     await reopened.close()
   })
 }
+
+test('a redaction saved as a stand-in before its encode is applied again on reopen', async () => {
+  const { page, frame, image, errors, close } = await open()
+  await page.keyboard.press('t')
+  const [tx, ty] = await pagePoint(page, frame, SIZE, 310, 320)
+  await page.mouse.click(tx, ty)
+  await page.keyboard.type('SECRET-alice')
+  await page.keyboard.press('Escape')
+  assert.equal(await flush(page), null)
+  await holdEncodes(frame)
+  await page.keyboard.press('x')
+  await drag(page, frame, SIZE, [[290, 290], [630, 370]])
+  const before = (await edits(page, { pending: true })).length
+  await until(async () => (await edits(page, { pending: true })).length > before)
+  const standIn = (await edits(page, { pending: true })).at(-1)
+  assert.ok(isPending(standIn))
+  await close()
+  // It holds the redaction, and nothing the last file didn't: not the text under the redaction.
+  assert.deepEqual(readMarkup(standIn).scene.shapes.map((shape) => shape.t), ['redact'])
+  assert.ok(sameBytes(readMarkup(standIn).original, image))
+  const reopened = await openEditor(browser)
+  await postImage(reopened.page, reopened.frame, standIn)
+  assert.match(await status(reopened.frame), /redacted areas are removed/)
+  await until(async () => (await edits(reopened.page)).length === 1)
+  const redrawn = (await edits(reopened.page))[0]
+  const row = await Promise.all([300, 302, 304, 306].map((x) => pixel(reopened.page, redrawn, x, 330)))
+  assert.ok(Math.max(...row.map((p) => p[0])) - Math.min(...row.map((p) => p[0])) < 60, 'the stripes are covered')
+  assert.ok(!Buffer.from(redrawn).includes(Buffer.from('SECRET')))
+  assert.deepEqual([...errors, ...reopened.errors], [])
+  await reopened.close()
+})
+
+test('a stand-in note that reached disk is not kept by later saves', async () => {
+  const plain = await (async () => {
+    const editor = await openEditor(browser)
+    const bytes = await makeImage(editor.page)
+    await editor.close()
+    return bytes
+  })()
+  const { page, frame, errors, close } = await openEditor(browser)
+  await postImage(page, frame, withPendingMark('png', plain))
+  await drag(page, frame, SIZE, [[100, 100], [200, 200]])
+  assert.equal(await flush(page), null)
+  assert.ok(sameBytes(readMarkup((await edits(page)).at(-1)).original, plain), 'the original inside has no note')
+  await frame.getByRole('button', { name: 'Clear all markup', exact: true }).click()
+  assert.equal(await flush(page), null)
+  assert.ok(sameBytes((await edits(page)).at(-1), plain), 'Clear all saves the image without the note')
+  assert.deepEqual(errors, [])
+  await close()
+})
 
 test('markup merged onto a new image during an encode is still sent', async () => {
   const { page, frame, errors, close } = await open()
