@@ -3480,6 +3480,148 @@
           ]
         }
       ]
+    },
+    {
+      "id": "stablyai.orca-binary-tools",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-plugins.git",
+        "ref": "main",
+        "path": "plugins/binary-tools"
+      },
+      "description": "Low-level binary inspection (ELF, AR archives, PE/COFF) with virtualized hex view, data inspector, and assembly syntax highlighting (x86/x64, ARM, GAS).",
+      "categories": [
+        "editors",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "1.0.3",
+          "commit": "81aa582e236d13760e2db203c80a47799e3d144a",
+          "contentHash": "a0e2feeaca8add8060963c9f458e7f239dbf4f2a1b69e8f7bf50e6c1f7b55715",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.245",
+          "name": "Binary & Assembly Tools",
+          "contributes": [
+            {
+              "kind": "syntaxes",
+              "name": "Assembly (x86 / x86_64)",
+              "detail": ".asm, .inc"
+            },
+            {
+              "kind": "syntaxes",
+              "name": "Assembly (ARM / AArch64)",
+              "detail": ".arm, .a64"
+            },
+            {
+              "kind": "syntaxes",
+              "name": "Assembly (GAS / AT&T)",
+              "detail": ".s"
+            },
+            {
+              "kind": "customEditors",
+              "name": "Binary Inspector",
+              "detail": ".o, .obj, .a, .lib, .so, .dylib, .dll, .exe, .bin, .elf, .out"
+            }
+          ],
+          "fileTypes": [
+            "asm",
+            "inc",
+            "arm",
+            "a64",
+            "s",
+            "o",
+            "obj",
+            "a",
+            "lib",
+            "so",
+            "dylib",
+            "dll",
+            "exe",
+            "bin",
+            "elf",
+            "out"
+          ],
+          "editorFileTypes": [
+            "o",
+            "obj",
+            "a",
+            "lib",
+            "so",
+            "dylib",
+            "dll",
+            "exe",
+            "bin",
+            "elf",
+            "out"
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-binary-tools/cover.jpg",
+              "alt": "Binary & Assembly Tools",
+              "sha256": "3b97fe15a50d134fe16451f351413eddb583e02d8239ab313da451903d1370a9",
+              "width": 1597,
+              "height": 985
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "stablyai.orca-cpp-kit",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/stablyai/orca-plugins.git",
+        "ref": "main",
+        "path": "plugins/cpp-kit"
+      },
+      "description": "Modern C/C++ support including inline/template headers (.ipp, .inl, .tpp, .tcc, .ixx) and full CMake language syntax highlighting.",
+      "categories": [
+        "syntax",
+        "official"
+      ],
+      "releases": [
+        {
+          "version": "1.0.2",
+          "commit": "81aa582e236d13760e2db203c80a47799e3d144a",
+          "contentHash": "1a2120b5eda607db9e8545aa2ef847cf3714c4ec61f3bb17e2ff8a9e96068c0d",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "C/C++ & CMake Kit",
+          "contributes": [
+            {
+              "kind": "syntaxes",
+              "name": "C++ Inlines & Templates",
+              "detail": ".ipp, .inl, .tpp, .tcc, .ixx, .cppm"
+            },
+            {
+              "kind": "syntaxes",
+              "name": "CMake",
+              "detail": ".cmake, CMakeLists.txt, CMakeCache.txt"
+            }
+          ],
+          "fileTypes": [
+            "ipp",
+            "inl",
+            "tpp",
+            "tcc",
+            "ixx",
+            "cppm",
+            "cmake"
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-cpp-kit/cover.jpg",
+              "alt": "C/C++ & CMake Kit",
+              "sha256": "61807d8254027cdf678fb9cbd565095951bb66e93376951e58a7ea6e3bf555fe",
+              "width": 1597,
+              "height": 985
+            }
+          }
+        }
+      ]
     }
   ]
 }
