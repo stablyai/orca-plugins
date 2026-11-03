@@ -1,9 +1,10 @@
-# Building Spreadsheet Viewer
+# Building Spreadsheet
 
 `../editor/index.html` is generated. Orca loads it as one document inside a sandboxed frame whose
 CSP allows only inline scripts and styles and no workers, so the build inlines
-everything into that one file. There is no framework: the grid is plain DOM, and the only
-dependency in the bundle is SheetJS.
+everything into that one file. There is no framework: the grid is plain DOM. The bundle holds two
+dependencies: SheetJS reads workbooks and formats numbers, and fflate inflates and deflates zip
+parts synchronously (the document session's `encode` and `merge` cannot wait).
 
 ```sh
 npm ci --ignore-scripts
@@ -32,7 +33,8 @@ What the build leaves out, and why:
 
 - SheetJS's code-page tables (`cpexcel`, ~470 KB): only BIFF5-and-earlier `.xls` files with
   non-Western code pages need them.
-- Writing, and every format other than the five Orca routes here.
+- SheetJS's writers, and every format other than the five Orca routes here. Saving does not go
+  through SheetJS (see below).
 
 ## Safety checks before parsing
 
@@ -44,38 +46,79 @@ What the build leaves out, and why:
   `.xls`) are refused as damaged, because SheetJS would otherwise read them as CSV text.
 - Encrypted packages and password-protected `.xls` files are recognised from SheetJS's errors.
 
+## Saving
+
+The document is the file's bytes plus the operations made since (`src/workbook-edits.js`): set
+cells, or insert or delete rows or columns. Each operation also changes the live model the grid
+shows and returns its inverse, which undo applies. Encoding replays the log onto the file's own
+XML, so a save changes only what was edited:
+
+- `.xlsx` / `.xlsm` (`src/xlsx-writer.js`): only the worksheets with edits (or recalculated
+  results) are rewritten, cell by cell. A cell keeps its style (`s`); new text is stored inline, so
+  the shared string table is untouched; shared formulas on a rewritten sheet are written out per
+  cell. `workbook.xml` gets `fullCalcOnLoad`, and the calculation chain is dropped, since a stale one
+  makes Excel repair the file. Every other part, macros included, keeps its compressed bytes.
+- Row and column changes move references in every formula, merged cells, column widths,
+  conditional formats, validation, hyperlinks, selections, page breaks and defined names. A sheet
+  with parts the writer does not move (drawings, comments, tables, pivot tables, `extLst`, …) or
+  that a chart or pivot cache reads refuses them (`xlsxShiftBlocker`).
+- `.ods` (`src/ods-writer.js`): only `content.xml` is rewritten, and in it only the edited cells,
+  splitting repeated rows and cells as needed. Formulas are kept in OpenDocument form and converted
+  to Excel's spelling for display (`src/formula-odf.js`). Row and column changes adjust repeat
+  counts, keep a sheet within its row limit, and move references in formulas and named ranges;
+  they stop at merged cells, pictures, charts, conditional formats and validation.
+- `.xls` and `.xlsb` are read-only: they are binary formats nothing here can write without losing
+  data.
+
+Formulas recalculate as cells change (`src/formula-eval.js`, `recalculate` in
+`src/workbook-edits.js`): only formulas that read a changed cell, directly or through others. A
+formula with a function the calculator lacks keeps its saved result.
+
+`test/workbook-writers.test.mjs` checks what changes and that every other part keeps its bytes,
+against hand-written workbooks (`scripts/styled-fixture.mjs`) with styles, shared strings and
+formulas, merges, conditional formats, validation, a defined name, a calculation chain, a drawing
+and a macro project.
+
 ## Source layout
 
 | File | What it holds |
 | --- | --- |
-| `src/editor.js` | Entry: `window.orca` documents, workbook state, sheet tabs, detail and status bars, copy |
+| `src/editor.js` | Entry: the document session, sheet tabs, formula and status bars, cell editor, menu, clipboard, undo |
+| `src/workbook-document.js` | The session's `decode`, `encode` and `merge`; which formats can be saved |
+| `src/workbook-edits.js` | Operations on the model, their inverses, and recalculation |
+| `src/xlsx-writer.js`, `src/xlsx-parts.js` | Saving into Office Open XML |
+| `src/ods-writer.js`, `src/formula-odf.js` | Saving into OpenDocument |
+| `src/edit-plan.js`, `src/xml-text.js` | Where an operation log lands in the XML; exact XML edits |
+| `src/formula-tokens.js`, `src/formula-shift.js`, `src/formula-eval.js` | Formula tokens, moving references, calculating |
+| `src/cell-input.js`, `src/tsv-paste.js` | Typed text and pasted text as cells |
+| `src/zip-archive.js` | Reading a zip with a real size cap, and rewriting it |
 | `src/grid-view.js` | The virtualized grid: rendering, scrolling, keyboard and pointer input |
 | `src/open-workbook.js` | Container sniffing, the zip check, SheetJS options, error classification |
-| `src/zip-budget.js` | The zip-bomb guard |
+| `src/zip-budget.js` | The zip-bomb guard on declared sizes |
 | `src/workbook-model.js` | Sheets, used extent, column widths and row heights from a SheetJS workbook |
 | `src/selection.js` | Selection and navigation, as a pure reducer |
 | `src/merge-index.js` | Merged-cell lookup by cell and by window |
 | `src/range-copy.js` | Selection to TSV and HTML, and the status bar's count/sum/average |
 | `src/cell-display.js`, `src/address.js` | Cell text, kinds, formulas; A1 addresses |
-| `src/document-message.js` | Validation of the document `window.orca` delivers |
 | `scripts/make-fixtures.mjs` | Writes the test workbooks to `/private/tmp/xlsx-fixtures` (or `$SPREADSHEET_FIXTURES`) |
-| `test/harness.mjs` | An Orca-like host: the same CSP, tokens and sandboxed `srcdoc` frame, in headless Chromium |
+| `test/harness.mjs` | An Orca-like host: the same CSP, tokens and sandboxed `srcdoc` frame, in headless Chromium, with a stand-in document session that keeps every edit |
+| `test/orca-testing/` | `mockEditorHost` from `orca/testing`, vendored (copy `orca-testing.mjs` and `orca-runtime.mjs` from Orca's `resources/plugins/declarative/` to update) |
 
 The browser tests use the Chromium that `playwright-core` expects (`npx playwright-core install
 chromium-headless-shell` if it is missing). Set `SPREADSHEET_SCREENSHOTS=<dir>` to save screenshots.
 
-## Protocol
+## Talking to Orca
 
-The frame talks to its editor tab with `postMessage`. The viewer does not edit cells yet, so it never posts edits.
+`orca.document.session({ decode, encode, merge })` does the document sync
+(`src/workbook-document.js`). It resolves once Orca's hello and the first document are in; Orca
+keeps the buffer, dirty state and saving, flushes the editor before a save, and hands over outside
+changes. `decode` only wraps the bytes; parsing waits for the grid. `encode` replays the log, and
+remembers what it encoded, so decoding Orca's copy of an accepted edit gives that value back
+instead of parsing the file again. `merge(base, outside, mine)` replays the operations this tab made
+since `base` onto `outside`.
 
-| Direction | Message | Meaning |
-| --- | --- | --- |
-| frame → Orca | `{ type: 'orca-editor-ready' }` | Listening; send the document. |
-| Orca → frame | `{ type: 'orca-editor-document', version, readOnly, fileType, content: { kind: 'bytes', bytes } }` | The file's bytes as a transferred `ArrayBuffer`, on open and whenever the file changes on disk; `version` grows with each change. The active sheet, selection and scroll position are kept when the sheet still exists. |
+The editor commits an open cell edit on `editor.flush` (registered before the session's handler),
+on the save shortcut and on `pagehide`, so a save includes what is being typed.
 
-Messages from anything but the parent window, documents whose `version` is not newer than the
-last one rendered, and `content.kind: 'text'` documents are ignored. `fileType` is informational; the format is detected from the bytes. Orca
-answers its watchdog pings in the frame shell, so the editor yields before parsing and keeps every
-step well under the 5 s pong timeout (a 50,000 × 12 workbook parses in under a second). Copy works
-through the native `copy` event, which Orca's Edit menu fires in the frame; the sandbox grants no
-clipboard API.
+`orca plugin test` runs only the tests that import no npm package (it refuses bare imports); run
+`npm test` here for all of them.

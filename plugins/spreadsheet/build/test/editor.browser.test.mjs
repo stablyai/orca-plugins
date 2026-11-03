@@ -3,9 +3,10 @@
 import { after, before, describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import * as XLSX from 'xlsx'
 import path from 'node:path'
 import { DEFAULT_FIXTURE_DIR, makeFixtures } from '../scripts/make-fixtures.mjs'
-import { launch, openEditor, postFile } from './harness.mjs'
+import { launch, openEditor, postFile, savedFile } from './harness.mjs'
 
 const FIXTURES = DEFAULT_FIXTURE_DIR
 const SCREENSHOTS = process.env.SPREADSHEET_SCREENSHOTS
@@ -14,7 +15,7 @@ const fixture = (name) => readFileSync(path.join(FIXTURES, name))
 
 let browser
 before(async () => {
-  if (!existsSync(path.join(FIXTURES, 'multi-sheet.xlsx'))) makeFixtures(FIXTURES)
+  if (!existsSync(path.join(FIXTURES, 'styled.ods'))) makeFixtures(FIXTURES)
   if (SCREENSHOTS) mkdirSync(SCREENSHOTS, { recursive: true })
   browser = await launch()
 })
@@ -35,7 +36,8 @@ describe('multi-sheet workbook', () => {
 
   before(async () => {
     ;({ page, frame, errors } = await openEditor(browser))
-    openMs = await postFile(page, frame, fixture('multi-sheet.xlsx'), 'xlsx')
+    // Read-only, as Orca opens an agent's transcript: the grid is the used range and nothing is sent.
+    openMs = await postFile(page, frame, fixture('multi-sheet.xlsx'), 'xlsx', { readOnly: true })
     console.log(`# multi-sheet.xlsx (50,000-row sheet) open to first paint: ${openMs} ms`)
   })
   after(() => page?.close())
@@ -82,13 +84,12 @@ describe('multi-sheet workbook', () => {
 
     await frame.locator('[role="row"][aria-rowindex="8"] [role="gridcell"][aria-colindex="3"]').click()
     assert.equal(await address(frame), 'B7')
-    assert.equal(await text(frame, '#detail-formula'), '=SUM(B3:B6)')
-    assert.equal(await text(frame, '#detail-value'), '= $443,631.50')
-    assert.equal(await text(frame, '#detail-raw'), 'Stored value 443631.5')
+    assert.equal(await frame.locator('#formula').inputValue(), '=SUM(B3:B6)')
+    assert.equal(await text(frame, '#result'), '= $443,631.50 · Stored value 443631.5')
     await screenshot(page, 'summary-formula')
 
     await frame.locator('[role="row"][aria-rowindex="9"] [role="gridcell"][aria-colindex="3"]').click()
-    assert.equal(await text(frame, '#detail-formula'), '=COUNTA(Data!A:A)-1')
+    assert.equal(await frame.locator('#formula').inputValue(), '=COUNTA(Data!A:A)-1')
   })
 
   test('keyboard moves, extends and selects', async () => {
@@ -203,17 +204,14 @@ describe('multi-sheet workbook', () => {
     await page.keyboard.press('ArrowRight')
     await page.keyboard.press('ArrowDown')
     assert.equal(await address(frame), 'B2')
-    await postFile(page, frame, fixture('small.xlsb'), 'xlsb')
+    await postFile(page, frame, fixture('small.xlsb'), 'xlsb', { readOnly: true })
     await frame.waitForFunction(() => document.getElementById('status-dims').textContent.startsWith('201 rows'))
     assert.equal(await frame.locator('[role="tab"][aria-selected="true"]').innerText(), 'Data')
     assert.equal(await address(frame), 'B2')
   })
 
-  test('ignores messages that are not binary spreadsheet documents', async () => {
+  test('ignores messages that are not documents', async () => {
     await page.evaluate(() => {
-      const version = window.__version + 1
-      window.__post({ version, readOnly: true, content: { kind: 'text', text: 'a,b' } })
-      window.__post({ version, readOnly: true, content: { kind: 'bytes', bytes: new Uint8Array(4) } })
       window.__post({ readOnly: true, content: { kind: 'bytes', bytes: new ArrayBuffer(4) } })
       window.__post({ type: 'something-else' })
       window.__post(null)
@@ -252,9 +250,9 @@ describe('other formats and failures', () => {
   }
 
   const failures = [
-    ['corrupt.xlsx', "This file couldn't be read as a spreadsheet. It may be damaged or in a format Spreadsheet Viewer doesn't support."],
-    ['garbage.xlsx', "This file couldn't be read as a spreadsheet. It may be damaged or in a format Spreadsheet Viewer doesn't support."],
-    ['encrypted.xlsx', "This workbook is password-protected. Spreadsheet Viewer can't open encrypted files."]
+    ['corrupt.xlsx', "This file couldn't be read as a spreadsheet. It may be damaged or in a format Spreadsheet doesn't support."],
+    ['garbage.xlsx', "This file couldn't be read as a spreadsheet. It may be damaged or in a format Spreadsheet doesn't support."],
+    ['encrypted.xlsx', "This workbook is password-protected. Spreadsheet can't open encrypted files."]
   ]
   for (const [name, message] of failures) {
     test(`explains ${name}`, async () => {
@@ -286,6 +284,144 @@ describe('dark theme', () => {
     await screenshot(page, 'summary-dark')
     await frame.locator('[role="tab"]', { hasText: 'Data' }).click()
     await screenshot(page, 'data-dark')
+    assert.deepEqual(errors.map(String), [])
+    await page.close()
+  })
+})
+
+describe('editing', () => {
+  let page
+  let frame
+  let errors
+  const gridCell = (address) => {
+    const { r, c } = XLSX.utils.decode_cell(address)
+    return frame.locator(`[role="row"][aria-rowindex="${r + 2}"] [role="gridcell"][aria-colindex="${c + 2}"]`)
+  }
+  const savedCell = async (sheet, address) => {
+    const wb = XLSX.read(await savedFile(page), { dense: true, cellFormula: true, cellNF: true })
+    const { r, c } = XLSX.utils.decode_cell(address)
+    return wb.Sheets[sheet]['!data'][r]?.[c]
+  }
+
+  before(async () => {
+    ;({ page, frame, errors } = await openEditor(browser))
+    await postFile(page, frame, fixture('styled.xlsx'), 'xlsx')
+  })
+  after(() => page?.close())
+
+  test('typing replaces a cell, keeps its format and recalculates', async () => {
+    assert.equal(await frame.locator('#notice').isVisible(), false)
+    assert.equal(await frame.locator('[role="grid"]').getAttribute('aria-readonly'), 'false')
+    await gridCell('B3').click()
+    await page.keyboard.type('500')
+    assert.equal(await frame.locator('#cell-editor').isVisible(), true)
+    assert.equal(await frame.locator('#formula').inputValue(), '500')
+    await page.keyboard.press('Enter')
+    assert.equal(await address(frame), 'B4')
+    assert.equal(await gridCell('B3').innerText(), '$500.00')
+    assert.equal(await gridCell('C3').innerText(), '$1,000.00')
+    assert.equal(await gridCell('B6').innerText(), '$1,800.00')
+    const saved = await savedCell('Budget', 'B3')
+    assert.equal(saved.v, 500)
+    assert.equal(saved.w, '$500.00')
+  })
+
+  test('formulas from the cell or the formula bar, and a refused one', async () => {
+    await gridCell('B5').click()
+    await page.keyboard.type('=B2/10')
+    await page.keyboard.press('Tab')
+    assert.equal(await address(frame), 'C5')
+    assert.equal(await gridCell('B5').innerText(), '$120.00')
+    await gridCell('A5').click()
+    await frame.locator('#formula').fill('Internet')
+    await frame.locator('#formula').press('Enter')
+    assert.equal(await gridCell('A5').innerText(), 'Internet')
+    await gridCell('A7').click()
+    await page.keyboard.type('=SUM(B2:B5')
+    await page.keyboard.press('Enter')
+    assert.match(await text(frame, '#status-note'), /formula isn't valid/)
+    assert.equal(await frame.locator('#cell-editor').isVisible(), true, 'the edit stays open to fix')
+    await page.keyboard.press('Escape')
+    assert.equal(await gridCell('A7').innerText(), '')
+    await screenshot(page, 'editing-light')
+    assert.equal((await savedCell('Budget', 'B5')).f, 'B2/10')
+  })
+
+  test('undo and redo walk the edits back and forth', async () => {
+    await gridCell('D2').click()
+    await page.keyboard.press('ControlOrMeta+z')
+    assert.equal(await gridCell('A5').innerText(), '')
+    await page.keyboard.press('ControlOrMeta+z')
+    assert.equal(await gridCell('B5').innerText(), '')
+    await page.keyboard.press('ControlOrMeta+Shift+z')
+    assert.equal(await gridCell('B5').innerText(), '$120.00')
+    assert.equal((await savedCell('Budget', 'A5')), undefined)
+  })
+
+  test('the menu inserts and deletes rows, and Delete clears', async () => {
+    await gridCell('A3').click()
+    await page.keyboard.press('Shift+F10')
+    assert.equal(await frame.locator('#menu').isVisible(), true)
+    await screenshot(page, 'editing-menu')
+    await frame.locator('[role="menuitem"]', { hasText: 'Insert row above' }).click()
+    assert.equal(await gridCell('A3').innerText(), '')
+    assert.equal(await gridCell('A4').innerText(), 'Power')
+    assert.equal(await gridCell('B7').innerText(), '$1,920.00')
+    assert.equal((await savedCell('Budget', 'B7')).f, 'SUM(B2:B6)')
+    await gridCell('A4').click()
+    await page.keyboard.press('Delete')
+    assert.equal(await gridCell('A4').innerText(), '')
+    await page.keyboard.press('ControlOrMeta+z')
+    await page.keyboard.press('ControlOrMeta+z')
+    assert.equal(await gridCell('A3').innerText(), 'Power')
+  })
+
+  test('pastes tab-separated text from the clipboard', async () => {
+    await gridCell('F2').click()
+    await frame.evaluate(() => {
+      const data = new DataTransfer()
+      data.setData('text/plain', 'Q1\tQ2\n10\t=F3*2\n')
+      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    })
+    assert.equal(await gridCell('G3').innerText(), '20')
+    assert.match(await text(frame, '#status-stats'), /^F2:G3 · Count 4/)
+  })
+
+  test('a sheet with a picture refuses row changes and says why', async () => {
+    await frame.locator('[role="tab"]', { hasText: 'Picture' }).click()
+    await gridCell('A1').click()
+    await page.keyboard.press('Shift+F10')
+    await frame.locator('[role="menuitem"]', { hasText: 'Delete row' }).click()
+    assert.match(await text(frame, '#status-note'), /^Can't delete rows on this sheet: it has charts, pictures or shapes/)
+    assert.equal(await gridCell('A1').innerText(), 'See the picture')
+    assert.deepEqual(errors.map(String), [])
+  })
+})
+
+describe('read-only files', () => {
+  test('a binary .xls opens read-only with a notice', async () => {
+    const { page, frame, errors } = await openEditor(browser)
+    await postFile(page, frame, fixture('small.xls'), 'xls')
+    assert.match(await text(frame, '#notice'), /^Read-only\. Excel 97-2003 \(\.xls\) files can't be saved/)
+    assert.equal(await frame.locator('[role="grid"]').getAttribute('aria-readonly'), 'true')
+    await frame.locator('[role="row"][aria-rowindex="4"] [role="gridcell"][aria-colindex="2"]').click()
+    await page.keyboard.type('x')
+    assert.equal(await frame.locator('#cell-editor').isVisible(), false)
+    assert.equal(await savedFile(page), null)
+    assert.deepEqual(errors.map(String), [])
+    await page.close()
+  })
+
+  test('an .ods file edits in the dark theme', async () => {
+    const { page, frame, errors } = await openEditor(browser, { theme: 'dark' })
+    await postFile(page, frame, fixture('styled.ods'), 'ods')
+    await frame.locator('[role="row"][aria-rowindex="4"] [role="gridcell"][aria-colindex="3"]').click()
+    await page.keyboard.type('450')
+    await page.keyboard.press('Enter')
+    assert.equal(await frame.locator('[role="row"][aria-rowindex="5"] [role="gridcell"][aria-colindex="3"]').innerText(), '1650')
+    await screenshot(page, 'editing-dark')
+    const wb = XLSX.read(await savedFile(page), { dense: true })
+    assert.equal(wb.Sheets.Budget['!data'][2][1].v, 450)
     assert.deepEqual(errors.map(String), [])
     await page.close()
   })

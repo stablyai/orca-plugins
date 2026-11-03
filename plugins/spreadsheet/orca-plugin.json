@@ -2,14 +2,14 @@
   "manifestVersion": 2,
   "id": "orca-spreadsheet",
   "publisher": "stablyai",
-  "name": "Spreadsheet Viewer",
-  "version": "1.1.0",
+  "name": "Spreadsheet",
+  "version": "2.0.0",
   "execution": "sandboxed-ui",
-  "description": "View Excel and OpenDocument spreadsheets in Orca's editor: every sheet, formulas and formatted values, even for very large files.",
+  "description": "Open and edit Excel and OpenDocument spreadsheets in Orca's editor: cells, formulas, rows and columns, with undo. Saves .xlsx, .xlsm and .ods in place, keeping their formatting.",
   "license": "MIT",
   "repository": "https://github.com/stablyai/orca-plugins/tree/main/plugins/spreadsheet",
   "engines": {
-    "orca": ">=1.4.245"
+    "orca": ">=1.4.248"
   },
   "contributes": {
     "customEditors": [
@@ -27,9 +27,14 @@
   "capabilities": [],
   "cover": {
     "path": "images/cover.png",
-    "alt": "A quarterly summary workbook in Spreadsheet Viewer: formatted currency, percentages and dates, a SUM formula above the grid, and sheet tabs"
+    "alt": "A quarterly summary workbook being edited: East's revenue changed and the totals recalculated, and a formula typed into a new Target column"
   },
   "screenshots": [
+    {
+      "path": "images/editing.png",
+      "alt": "Two rows selected with the cell menu open: insert rows above or below, delete rows, insert or delete columns, clear contents",
+      "caption": "Insert and delete rows and columns"
+    },
     {
       "path": "images/sheets.png",
       "alt": "A 50,000-row data sheet with a block of cells selected and its count, sum and average in the status bar",
@@ -37,7 +42,7 @@
     },
     {
       "path": "images/dark.png",
-      "alt": "The same summary workbook in Orca's dark theme, with merged title and notes cells and a #DIV/0! error in red",
+      "alt": "The summary workbook in Orca's dark theme after an edit, with the changed revenue, recalculated totals and a #DIV/0! error in red",
       "caption": "Follows Orca's dark theme"
     }
   ]

@@ -70,7 +70,8 @@ export function reduceSelection(selection, action, grid) {
     case 'sheetStart':
       return place(0, 0)
     case 'sheetEnd':
-      return place(lastRow, lastColumn)
+      // The last used cell, as Excel's Ctrl+End; an editable grid runs past it.
+      return place(Math.max(0, (grid.usedRows ?? grid.rowCount) - 1), Math.max(0, (grid.usedColumns ?? grid.columnCount) - 1))
     case 'cell':
       return place(action.r, action.c)
     case 'row': {

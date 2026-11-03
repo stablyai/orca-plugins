@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import * as XLSX from 'xlsx'
 import { deflateRawSync } from 'node:zlib'
 import { checkOfficeZipBudget, OFFICE_ZIP_MAX_ENTRIES, OFFICE_ZIP_MAX_UNCOMPRESSED_BYTES } from '../src/zip-budget.js'
-import { inflateWorkbookZip } from '../src/zip-inflate.js'
+import { readZip, storedZip, writeZip } from '../src/zip-archive.js'
 
 /** A zip holding only a central directory, with the given declared sizes. */
 function zipWithEntries(sizes, { comment = 0 } = {}) {
@@ -82,18 +82,33 @@ function zeroSizedBomb(inflatedBytes) {
   return new Uint8Array(Buffer.concat([local, name, data, central, name, end]))
 }
 
-test('a declared size of 0 passes the declared budget but not the inflated one', async () => {
+test('a declared size that lies is refused before anything grows past it', () => {
   const bomb = zeroSizedBomb(4 * 1024 * 1024)
   assert.equal(checkOfficeZipBudget(bomb), 'ok')
-  assert.deepEqual(await inflateWorkbookZip(bomb, 1024 * 1024), { status: 'too-large' })
-  assert.equal((await inflateWorkbookZip(bomb, 8 * 1024 * 1024)).status, 'ok')
+  assert.deepEqual(readZip(bomb), { status: 'corrupt' })
 })
 
-test('a real workbook round-trips through the stored copy SheetJS reads', async () => {
+test('a real workbook round-trips through the stored copy SheetJS reads', () => {
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['a', 1]]), 'One')
   const zipped = new Uint8Array(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', compression: true }))
-  const inflated = await inflateWorkbookZip(zipped)
-  assert.equal(inflated.status, 'ok')
-  assert.deepEqual(XLSX.read(inflated.bytes, { type: 'array' }).SheetNames, ['One'])
+  const read = readZip(zipped)
+  assert.equal(read.status, 'ok')
+  assert.deepEqual(XLSX.read(storedZip(read.entries), { type: 'array' }).SheetNames, ['One'])
+  assert.deepEqual(readZip(zipped, 100), { status: 'too-large' })
+})
+
+test('rewriting copies untouched entries byte for byte and deflates replaced ones', () => {
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['a', 1]]), 'One')
+  const { entries } = readZip(new Uint8Array(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', compression: true })))
+  const changed = entries.map((entry) => (entry.name === 'docProps/app.xml' ? { ...entry, data: new TextEncoder().encode('<x/>'), raw: null } : entry))
+  const reread = readZip(writeZip(changed))
+  assert.equal(reread.status, 'ok')
+  assert.deepEqual(reread.entries.map((entry) => entry.name), entries.map((entry) => entry.name))
+  for (const entry of reread.entries) {
+    const before = entries.find((other) => other.name === entry.name)
+    if (entry.name === 'docProps/app.xml') assert.equal(new TextDecoder().decode(entry.data), '<x/>')
+    else assert.deepEqual(entry.raw, before.raw)
+  }
 })

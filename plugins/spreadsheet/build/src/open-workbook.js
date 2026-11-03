@@ -1,14 +1,15 @@
 import { checkOfficeZipBudget } from './zip-budget.js'
-import { inflateWorkbookZip } from './zip-inflate.js'
+import { readZip, storedZip } from './zip-archive.js'
 
-// cellText keeps SheetJS's `.w`, so number and date formats read as Excel shows them. cellStyles is
-// on only because SheetJS reads column widths and row heights under it; fills and fonts go unused.
+// cellText keeps SheetJS's `.w`, so number and date formats read as Excel shows them; cellNF keeps
+// each cell's format (`.z`) for values typed into it. cellStyles is on only because SheetJS reads
+// column widths and row heights under it; fills and fonts go unused.
 export const READ_OPTIONS = Object.freeze({
   type: 'array',
   dense: true,
   cellFormula: true,
   cellText: true,
-  cellNF: false,
+  cellNF: true,
   cellHTML: false,
   cellStyles: true,
   cellDates: false,
@@ -45,18 +46,23 @@ export function classifyReadError(error) {
 }
 
 /**
- * @returns {Promise<{ status: 'ok', workbook: object } | { status: 'encrypted' | 'corrupt' | 'too-large' }>}
+ * Reads a workbook synchronously. `entries` is the inflated zip, for the writers; null for files
+ * that are no zip.
+ * @returns {{ status: 'ok', workbook: object, entries: import('./zip-archive.js').ZipEntry[] | null } |
+ *   { status: 'encrypted' | 'corrupt' | 'too-large' }}
  */
-export async function openWorkbook(XLSX, bytes) {
+export function openWorkbook(XLSX, bytes) {
   const container = sniffContainer(bytes)
   if (container === 'unknown') return { status: 'corrupt' }
+  let entries = null
   if (container === 'zip') {
     const budget = checkOfficeZipBudget(bytes)
     if (budget !== 'ok') return { status: budget }
     // Why: declared sizes can lie, and SheetJS trusts them; only counted output bytes cap a bomb.
-    const inflated = await inflateWorkbookZip(bytes)
-    if (inflated.status !== 'ok') return { status: inflated.status }
-    bytes = inflated.bytes
+    const zip = readZip(bytes)
+    if (zip.status !== 'ok') return { status: zip.status }
+    entries = zip.entries
+    bytes = storedZip(entries)
   }
   let workbook
   try {
@@ -68,5 +74,5 @@ export async function openWorkbook(XLSX, bytes) {
   if (!workbook || !Array.isArray(workbook.SheetNames) || typeof workbook.Sheets !== 'object') {
     return { status: 'corrupt' }
   }
-  return { status: 'ok', workbook }
+  return { status: 'ok', workbook, entries }
 }
