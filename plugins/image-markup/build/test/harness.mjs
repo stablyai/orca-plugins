@@ -216,9 +216,9 @@ export async function postImage(page, frame, bytes, options = {}) {
 }
 
 /** Makes a test image in the browser: a gradient with a few solid blocks, so pixels are checkable. */
-export async function makeImage(page, { width = 640, height = 400, type = 'image/png', quality, seed = 0 } = {}) {
+export async function makeImage(page, { width = 640, height = 400, type = 'image/png', quality, seed = 0, label = '', orientation = 0 } = {}) {
   const data = await page.evaluate(
-    async ([w, h, t, q, seed]) => {
+    async ([w, h, t, q, seed, label]) => {
       const canvas = new OffscreenCanvas(w, h)
       const ctx = canvas.getContext('2d')
       const gradient = ctx.createLinearGradient(0, 0, w, h)
@@ -233,17 +233,41 @@ export async function makeImage(page, { width = 640, height = 400, type = 'image
         ctx.fillStyle = (x / 4) % 2 ? '#000000' : '#ffffff'
         ctx.fillRect(x, 300, 2, 60)
       }
+      if (label) {
+        ctx.fillStyle = '#ffffff'
+        ctx.font = '600 28px monospace'
+        ctx.fillText(label, 110, 300)
+      }
       const blob = await canvas.convertToBlob(q === undefined ? { type: t } : { type: t, quality: q })
       return window.__toBase64(new Uint8Array(await blob.arrayBuffer()))
     },
-    [width, height, type, quality, seed]
+    [width, height, type, quality, seed, label]
   )
-  return fromBase64(data)
+  const bytes = fromBase64(data)
+  return orientation ? withExifOrientation(bytes, orientation) : bytes
 }
 
-/** The edits Orca has received, as Uint8Arrays. */
-export async function edits(page) {
-  return (await page.evaluate(() => window.__edits.map((edit) => window.__toBase64(edit.bytes)))).map(fromBase64)
+/** A JPEG with an EXIF APP1 segment asking viewers to rotate it (6: 90° clockwise). */
+function withExifOrientation(jpeg, orientation) {
+  const tiff = Buffer.from([
+    0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08, // big-endian TIFF, first IFD at 8
+    0x00, 0x01, // one entry
+    0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, orientation, 0x00, 0x00, // Orientation, SHORT
+    0x00, 0x00, 0x00, 0x00 // no next IFD
+  ])
+  const body = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), tiff])
+  const segment = Buffer.concat([Buffer.from([0xff, 0xe1, (body.length + 2) >> 8, (body.length + 2) & 0xff]), body])
+  return new Uint8Array(Buffer.concat([jpeg.subarray(0, 2), segment, jpeg.subarray(2)]))
+}
+
+const PENDING_NOTE = Buffer.from('image-markup: an edit is still being encoded')
+/** Whether an edit is the stand-in that marks the tab unsaved while an encode runs. */
+export const isPending = (bytes) => Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).includes(PENDING_NOTE)
+
+/** The encoded edits Orca has received, as Uint8Arrays; `{ pending: true }` includes the stand-ins. */
+export async function edits(page, { pending = false } = {}) {
+  const all = (await page.evaluate(() => window.__edits.map((edit) => window.__toBase64(edit.bytes)))).map(fromBase64)
+  return pending ? all : all.filter((bytes) => !isPending(bytes))
 }
 
 /** RGBA of image pixel (x, y) after decoding `bytes` in the browser. */

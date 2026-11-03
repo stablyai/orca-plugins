@@ -27,7 +27,7 @@ update it).
 | `src/editor.js`, `src/editor.css` | Frame wiring, tools, rendering, history, encoding, Copy and Export |
 | `src/document-sync.js` | Orca's document session: how a file decodes, encodes and merges with an outside write |
 | `src/scene.js` | Shape model: bounds, hit tests, moves, handles, simplifying, (de)serialising |
-| `src/render.js` | Drawing shapes, text metrics, redaction mosaics, the full-resolution flattened render |
+| `src/render.js` | Drawing shapes, text metrics, redaction fills, the full-resolution flattened render |
 | `src/png.js` | PNG encoder: RGB when opaque, per-row adaptive filters, native deflate |
 | `src/container.js` | Markup stored in PNG `orCA` chunks and JPEG APP9 segments, with a pixel CRC |
 | `src/view.js` | Fit, zoom and coordinate mapping |
@@ -66,8 +66,12 @@ drawing, panning and zooming hold 60 fps in headless software rendering.
   can't encode, so a merge that changed anything is marked `stale` and carries the outside file;
   the editor loads it, encodes it and sends it as its next change. Strokes not yet handed to the
   session merge the same way when an outside change arrives.
-- Redactions are rendered into the original before it is stored, and left out of the stored
-  scene. With nothing else to keep, the file is just the redacted image.
+- Redactions, and every shape drawn before the last one, are rendered into the original before
+  it is stored and left out of the stored scene, so nothing they cover survives as pixels or as
+  text. With nothing else to keep, the file is just the flattened image.
+- Orca flushes editors before a save, not before closing or reloading a tab, and an encode can
+  take seconds. So the first edit after each handover sends the last file with a note added (a
+  private `orCp` PNG chunk or a JPEG comment): the tab is unsaved at once and closing it asks.
 - `orca.files.saveAs` (desktop only, needs the click's activation) is Export. The render is kept,
   so when a large image outlasts the click, the second click saves at once.
 

@@ -9,7 +9,7 @@
 // The file is only written through Orca's document session: edits are debounced, encoded off the
 // main thread, and handed over as the whole new file (see container.js for the format); Orca
 // keeps it dirty, saves it on ⌘S, and merges writes from outside (see document-sync.js).
-import { SAVABLE_FORMATS, imageSize, withPngDensity, writeMarkup } from './container.js'
+import { SAVABLE_FORMATS, imageSize, withPendingMark, withPngDensity, writeMarkup } from './container.js'
 import { mergeImages, openImageSession, sameFile } from './document-sync.js'
 import {
   TEXT_LINE_HEIGHT,
@@ -93,6 +93,7 @@ const s = {
   // Document
   readOnly: true,
   format: null,
+  marked: undefined, // `posted` when the tab was last marked unsaved ahead of an encode
   savable: false,
   original: null, // the image's own bytes: the file, or the original kept inside saved markup
   hadMarkup: false,
@@ -461,9 +462,23 @@ const canSave = () => s.bitmap !== null && s.savable && !s.readOnly && doc !== n
 
 function scheduleCommit() {
   if (!canSave()) return
+  markPending()
   window.clearTimeout(s.timer)
   s.timer = window.setTimeout(commit, EDIT_DEBOUNCE_MS)
   updateStatus()
+}
+
+/**
+ * Orca flushes an editor before a save, not before closing or reloading its tab, and the encode can
+ * take seconds. So the first edit after each handover sends the last file with a note added: the
+ * tab reads as unsaved at once, and closing it asks first. A save waits for the real encode.
+ */
+function markPending() {
+  if (!s.base || s.marked === s.posted || s.shapes === s.posted) return
+  const file = withPendingMark(s.format, s.base.file)
+  if (!file) return
+  s.marked = s.posted
+  doc.change({ ...s.base, shapes: s.shapes, file, pending: true })
 }
 
 /** Encodes the latest scene and hands it to the session; resolves once the session has it. */
@@ -489,7 +504,9 @@ async function commitLoop() {
       s.saveError = `Couldn't encode the markup: ${error?.message ?? error}`
       return
     }
-    if (bitmap !== s.bitmap || !canSave()) return
+    // A new image arrived meanwhile (its merge reset `posted`): encode again for it.
+    if (bitmap !== s.bitmap) continue
+    if (!canSave()) return
     if (value.file.byteLength > MAX_DOCUMENT_BYTES) {
       s.saveError = "The image with markup is over Orca's 64 MiB limit, too large to save."
       return
@@ -524,36 +541,37 @@ async function flush() {
 
 /**
  * The session value for `shapes`: the original when there is no markup, else the flattened image
- * with the markup and the original inside. Redactions are burned into that original too, so the
- * saved file never holds the pixels under them; with nothing else to keep, it is just that image.
+ * with the markup and the original inside. With a redaction, everything up to the last one is
+ * burned into that original, so no saved form keeps what it covers (pixels, or text and strokes
+ * under it); only the shapes drawn after it stay editable, or none, leaving just that image.
  */
 async function encodeValue(shapes) {
-  const value = { format: s.format, original: s.original, shapes, hadMarkup: s.hadMarkup }
+  const value = { format: s.format, original: s.original, shapes, hadMarkup: s.hadMarkup, size: [s.width, s.height] }
   if (shapes.length === 0) return { ...value, file: s.original }
   const type = s.format === 'jpeg' ? 'image/jpeg' : 'image/png'
-  const redactions = shapes.filter((shape) => shape.t === 'redact')
-  const scene = redactions.length ? shapes.filter((shape) => shape.t !== 'redact') : shapes
+  const burned = shapes.findLastIndex((shape) => shape.t === 'redact') + 1
+  const scene = burned ? shapes.slice(burned) : shapes
   const flattened = new Uint8Array(await (await flattenedBlob(shapes, type)).arrayBuffer())
-  if (redactions.length === 0) {
+  if (!burned) {
     return { ...value, file: writeMarkup(s.format, flattened, s.original, serializeScene(scene, s.width, s.height)) }
   }
-  const redacted = withDensity(new Uint8Array(await (await flattenedBlob(redactions, type)).arrayBuffer()))
-  if (scene.length === 0) return { ...value, file: redacted }
+  if (scene.length === 0) return { ...value, file: withDensity(flattened) }
+  const redacted = withDensity(new Uint8Array(await (await flattenedBlob(shapes.slice(0, burned), type, { keep: false })).arrayBuffer()))
   return { ...value, file: writeMarkup(s.format, flattened, redacted, serializeScene(scene, s.width, s.height)) }
 }
 
 const withDensity = (bytes) => (s.format === 'png' ? withPngDensity(bytes, s.original) : bytes)
 
 /** A full-resolution render of `shapes`; the latest is kept, so Copy and Export after a save reuse it. */
-function flattenedBlob(shapes, type = 'image/png') {
+function flattenedBlob(shapes, type = 'image/png', { keep = true } = {}) {
   const cache = s.flatCache
   if (cache && cache.shapes === shapes && cache.bitmap === s.bitmap && cache.type === type) return cache.blob
   const blob = renderFlattened(s.bitmap, shapes, type, {
     urgent: () => s.urgent,
     busy: () => s.op !== null || performance.now() - s.lastGesture < 300
   })
-  // Redaction-only renders are a step of a save; keeping them would evict the full one.
-  if (!shapes.every((shape) => shape.t === 'redact') || shapes === s.shapes) {
+  // A partial render (the burned original) is a step of a save; keeping it would evict the full one.
+  if (keep) {
     s.flatCache = { shapes, bitmap: s.bitmap, type, blob }
     blob.catch(() => {
       if (s.flatCache?.blob === blob) s.flatCache = null
@@ -691,7 +709,7 @@ async function load(value, { outside = false } = {}) {
   const token = ++loadToken
   // This editor's own file (a conflict settled with it, or a change reverted): the scene shows it,
   // and a decode still running for a newer document must not replace it.
-  if (outside && s.base && sameFile(value, s.base)) return
+  if (outside && (value.pending || (s.base && sameFile(value, s.base)))) return
   window.clearTimeout(s.timer)
   s.timer = undefined
   // Strokes the session hasn't been handed yet: merge them like the session merges its draft.
@@ -706,7 +724,8 @@ async function load(value, { outside = false } = {}) {
     if (value.original !== value.file) {
       // Only this plugin ever decodes the original inside, so its header must vouch for its size.
       bitmap = await decode(value.original, { requireSize: true }).catch(() => null)
-      const size = imageSize(value.original)
+      // The scene's size, which is the shown size: an EXIF-rotated JPEG swaps its header's sides.
+      const size = value.size
       if (bitmap && (!size || bitmap.width !== size[0] || bitmap.height !== size[1])) {
         bitmap.close()
         bitmap = null

@@ -353,6 +353,41 @@ export function withPngDensity(encoded, original) {
   return out
 }
 
+const PENDING_NOTE = ascii('image-markup: an edit is still being encoded')
+
+/**
+ * `bytes` with a harmless note added (a private PNG chunk, a JPEG comment), so it differs from the
+ * file while showing the same image. Marks the tab unsaved before an edit has finished encoding.
+ */
+export function withPendingMark(format, bytes) {
+  if (format === 'png') {
+    const end = pngChunks(bytes)?.find((chunk) => chunk.type === 'IEND')
+    if (!end) return null
+    const out = new Uint8Array(bytes.length + 12 + PENDING_NOTE.length)
+    out.set(bytes.subarray(0, end.start), 0)
+    let at = end.start
+    writeU32(out, at, PENDING_NOTE.length)
+    out.set(ascii('orCp'), at + 4)
+    out.set(PENDING_NOTE, at + 8)
+    writeU32(out, at + 8 + PENDING_NOTE.length, crc32(out, at + 4, at + 8 + PENDING_NOTE.length))
+    at += 12 + PENDING_NOTE.length
+    out.set(bytes.subarray(end.start), at)
+    return out
+  }
+  if (format === 'jpeg') {
+    if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return null
+    const out = new Uint8Array(bytes.length + 4 + PENDING_NOTE.length)
+    out.set(bytes.subarray(0, 2), 0)
+    out[2] = 0xff
+    out[3] = 0xfe
+    writeU16(out, 4, 2 + PENDING_NOTE.length)
+    out.set(PENDING_NOTE, 6)
+    out.set(bytes.subarray(2), 6 + PENDING_NOTE.length)
+    return out
+  }
+  return null
+}
+
 /** Byte equality, comparing 4 bytes at a time when both views are aligned. */
 export function sameBytes(a, b) {
   if (a === b) return true

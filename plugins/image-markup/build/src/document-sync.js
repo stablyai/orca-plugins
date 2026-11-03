@@ -1,13 +1,14 @@
 // The image's document sync, on Orca's `orca.document.session()`: Orca keeps the buffer, dirty
 // state, saving and flushes; this file says how a file is read, written and merged.
 //
-// A value is { file, format, original, shapes, hadMarkup, stale? }: `file` is the whole file the
-// value saves as, `original` the image under the markup and `shapes` the markup. Encoding a scene
+// A value is { file, format, original, shapes, hadMarkup, size?, stale?, pending? }: `file` is the
+// whole file the value saves as, `original` the image under the markup, `shapes` the markup and
+// `size` the image's shown size. `pending` marks a stand-in sent before an encode finished. Encoding a scene
 // into a file is asynchronous (the editor does it before `change`), so `encode` only hands over
 // `file`. A merge that moved markup onto a new image can't encode, so it returns `stale: true`
 // with the outside file; the editor encodes it and sends the result as its next change.
 import { SAVABLE_FORMATS, detectFormat, imageSize, readMarkup, sameBytes } from './container.js'
-import { parseScene, serializeScene } from './scene.js'
+import { parseScene, renumberSteps, serializeScene } from './scene.js'
 
 /** A file's bytes as a value; a file this plugin did not write is an original with no shapes. */
 export function decodeImage(content) {
@@ -21,10 +22,12 @@ export function decodeImage(content) {
   } catch {
     // Malformed markup data: open the file as a plain image.
   }
-  const size = markup && imageSize(markup.original)
+  // Either side may be the width: an EXIF-rotated JPEG shows (and was marked up) with them swapped.
+  const header = markup && imageSize(markup.original)
+  const size = header && [header, [header[1], header[0]]].find(([w, h]) => w === markup.scene?.w && h === markup.scene?.h)
   const shapes = size && parseScene(markup.scene, size[0], size[1])
   if (!shapes) return plain
-  return { file, format, original: markup.original.slice(), shapes, hadMarkup: shapes.length > 0 }
+  return { file, format, original: markup.original.slice(), shapes, hadMarkup: shapes.length > 0, size }
 }
 
 const exactBuffer = (bytes) =>
@@ -50,7 +53,7 @@ export function mergeImages(base, outside, mine) {
   const keptKeys = new Set(kept.map(shapeKey))
   const added = mine.shapes.filter((shape) => !baseKeys.has(shapeKey(shape)) && !keptKeys.has(shapeKey(shape)))
   if (added.length === 0 && kept.length === outside.shapes.length) return outside
-  const shapes = [...kept, ...added]
+  const shapes = renumberSteps([...kept, ...added])
   // Only PNG and JPEG keep markup; on another format the shapes still show until the tab closes.
   return { ...outside, shapes, hadMarkup: outside.hadMarkup, stale: true }
 }

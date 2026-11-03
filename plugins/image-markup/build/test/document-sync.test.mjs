@@ -127,3 +127,18 @@ test('merge: nothing added or removed here leaves the outside file untouched', (
   const outside = decodeImage({ kind: 'bytes', bytes: saved(png(64, 32, 2), [box(4)]).slice().buffer })
   assert.equal(mergeImages(base, outside, base), outside)
 })
+
+test('merge: step numbers run 1, 2, 3 again after both sides added steps', () => {
+  const step = (x, n) => ({ t: 'step', c: '#ff3b30', z: 20, x, y: 10, n })
+  const base = decodeImage({ kind: 'bytes', bytes: saved(png(64, 32, 1), [step(5, 1)]).slice().buffer })
+  const outside = decodeImage({ kind: 'bytes', bytes: saved(png(64, 32, 1), [step(5, 1), step(20, 2)]).slice().buffer })
+  const mine = edited(base, [base.shapes[0], { ...step(40, 2), id: 9 }])
+  assert.deepEqual(mergeImages(base, outside, mine).shapes.map((shape) => [shape.x, shape.n]), [[5, 1], [20, 2], [40, 3]])
+})
+
+test('decodes the markup of an EXIF-rotated photo against its shown, swapped size', () => {
+  const original = png(64, 32, 1)
+  const value = decodeImage({ kind: 'bytes', bytes: writeMarkup('png', png(32, 64, 99), original, scene([box(5)], 32, 64)).slice().buffer })
+  assert.deepEqual(value.size, [32, 64])
+  assert.deepEqual(kinds(value), ['box@5'])
+})

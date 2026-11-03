@@ -13,7 +13,7 @@ Orca's own viewer stays one click away in the editor's view toggle. Draw with:
 | Ellipse | `O` | Hold Shift for a circle |
 | Text | `T` | Click to type; Esc or a click outside finishes |
 | Step number | `N` | Each click places the next numbered disc; deleting one renumbers the rest |
-| Redact | `X` | Drag over anything secret to pixelate it; see below |
+| Redact | `X` | Drag over anything secret to cover it; see below |
 
 `1`–`8` pick a colour and the dots pick a stroke size; with a shape selected, both restyle it.
 Delete removes the selection, arrow keys nudge it, `⌘Z` / `⇧⌘Z` undo and redo. Pinch or
@@ -23,7 +23,7 @@ Ctrl/⌘-scroll zooms, scrolling or dragging empty space pans, Space-drag pans w
 ## Saving, exporting and copying
 
 **`⌘S`** saves the markup into the image file through Orca's normal save, and the tab shows
-unsaved changes like any other file. The file then shows the markup everywhere: other viewers,
+unsaved changes like any other file, from the first stroke on. The file then shows the markup everywhere: other viewers,
 agents, uploads. It also keeps the original image and the shapes inside it, so reopening Markup
 gives you the untouched original with every shape still editable, and clearing all markup and
 saving restores the original file byte for byte. Close the tab without saving to throw the
@@ -44,11 +44,14 @@ original. JPEG markup is saved as a new JPEG at quality 0.92; the original keeps
 
 ## Redaction
 
-Redact pixelates an area into coarse, noisy tiles. Saving removes those pixels from the file for
-good: they are pixelated in the visible image **and** in the original kept inside, and the
-redaction itself is not kept as an editable shape. A JPEG's kept original is then re-encoded at
-quality 0.92. Until you save you can still move, resize or undo a redaction; after saving,
-clearing all markup restores the redacted image, not the secret.
+Redact covers an area with one flat colour (the area's average, hatched so it reads as
+redacted). Nothing of what was under it can be read back. Saving removes it from the file for
+good: the area is covered in the visible image **and** in the original kept inside. Everything
+drawn before the last redaction (text, strokes, steps) is flattened into that original with
+it, so no label or stroke under a redaction survives as text in the file; only markup drawn
+after it stays editable. A JPEG's kept original is then re-encoded at quality 0.92. Until you
+save you can still move, resize or undo a redaction; after saving, clearing all markup restores
+the redacted image, not the secret.
 
 Every other tool only draws over the image: a box or pen stroke over a password hides it from
 viewers, but the original kept inside still has it. Use Redact for anything secret.

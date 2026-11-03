@@ -8,7 +8,7 @@
 //   text  { t: 'text',  c, z, x, y, text }                  z is the font size, (x, y) its top left
 //   marker { t: 'marker', c, s, p: [x0, y0, ...] }          a translucent highlighter stroke
 //   step  { t: 'step',  c, z, x, y, n }                     a numbered disc: z across, (x, y) its centre
-//   redact { t: 'redact', p: [x1, y1, x2, y2] }             pixelated; burned into the kept original on save
+//   redact { t: 'redact', p: [x1, y1, x2, y2] }             a flat fill; burned into the kept original on save
 //
 // `c` is a #rrggbb colour and `s` a stroke width. In memory each shape also has a numeric `id`.
 
@@ -24,9 +24,6 @@ export const isBoxLike = (shape) => shape.t === 'box' || shape.t === 'ellipse' |
 export const isStroke = (shape) => shape.t === 'pen' || shape.t === 'marker'
 /** Highlighter opacity, shared by drawing and the live stroke. */
 export const MARKER_ALPHA = 0.4
-
-/** Mosaic tile size for redactions on a width×height image, in image pixels: coarse enough that text can't be read back. */
-export const redactBlock = (width, height) => Math.max(6, Math.round(Math.min(width, height) / 60))
 
 /** Renumbers step markers 1, 2, 3… in drawing order; returns `shapes` itself when nothing changed. */
 export function renumberSteps(shapes) {

@@ -1,7 +1,7 @@
 // Draws shapes onto a 2D context already transformed to image pixels. Paths and text metrics are
 // cached per shape object; shapes are immutable, so a cached entry never goes stale.
 import { encodePng } from './png.js'
-import { MARKER_ALPHA, TEXT_LINE_HEIGHT, arrowHead, redactBlock, textHalo } from './scene.js'
+import { MARKER_ALPHA, TEXT_LINE_HEIGHT, arrowHead, textHalo } from './scene.js'
 
 const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'
 export const fontFor = (size) => `600 ${size}px ${FONT_FAMILY}`
@@ -112,56 +112,62 @@ function drawStep(ctx, shape) {
   ctx.fillText(label, shape.x, shape.y + shape.z * 0.03)
 }
 
-const mosaics = new WeakMap()
+const fills = new WeakMap()
 
-/** A redaction's mosaic: the image under it averaged into coarse tiles, with per-tile noise. */
-function mosaicFor(shape, source) {
-  const cached = mosaics.get(shape)
+/** A redaction's colour: the mean of the image under it, so the patch blends in but holds nothing. */
+function fillFor(shape, source) {
+  const cached = fills.get(shape)
   if (cached?.source === source) return cached
-  const x0 = Math.max(0, Math.floor(Math.min(shape.p[0], shape.p[2])))
-  const y0 = Math.max(0, Math.floor(Math.min(shape.p[1], shape.p[3])))
-  const x1 = Math.min(source.width, Math.ceil(Math.max(shape.p[0], shape.p[2])))
-  const y1 = Math.min(source.height, Math.ceil(Math.max(shape.p[1], shape.p[3])))
-  const entry = { source, x0, y0, width: x1 - x0, height: y1 - y0, canvas: null }
+  const [x0, y0, x1, y1] = redactRect(shape, source)
+  const entry = { source, x0, y0, width: x1 - x0, height: y1 - y0, color: '#808080', hatch: 'rgba(0,0,0,0.18)' }
   if (entry.width > 0 && entry.height > 0) {
-    const block = redactBlock(source.width, source.height)
-    const cols = Math.max(1, Math.round(entry.width / block))
-    const rows = Math.max(1, Math.round(entry.height / block))
-    const canvas = new OffscreenCanvas(cols, rows)
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    const ctx = new OffscreenCanvas(1, 1).getContext('2d', { willReadFrequently: true })
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(source, x0, y0, entry.width, entry.height, 0, 0, cols, rows)
-    // Why noise: a clean average of each tile can be matched against rendered text and read back.
-    const data = ctx.getImageData(0, 0, cols, rows)
-    const d = data.data
-    for (let i = 0; i < d.length; i += 4) {
-      let h = Math.imul((i >> 2) ^ 0x9e3779b9, 0x85ebca6b)
-      h ^= h >>> 13
-      const noise = ((h & 0xff) - 128) / 6
-      d[i] += noise
-      d[i + 1] += noise
-      d[i + 2] += noise
-      d[i + 3] = 255
-    }
-    ctx.putImageData(data, 0, 0)
-    entry.canvas = canvas
+    ctx.drawImage(source, x0, y0, entry.width, entry.height, 0, 0, 1, 1)
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
+    entry.color = `rgb(${r},${g},${b})`
+    entry.hatch = 0.2126 * r + 0.7152 * g + 0.0722 * b > 140 ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.22)'
   }
-  mosaics.set(shape, entry)
+  fills.set(shape, entry)
   return entry
 }
 
-function drawRedaction(ctx, shape, source) {
-  if (!source) return
-  const { canvas, x0, y0, width, height } = mosaicFor(shape, source)
-  if (!canvas) return
-  const smoothing = ctx.imageSmoothingEnabled
-  ctx.imageSmoothingEnabled = false
-  ctx.drawImage(canvas, x0, y0, width, height)
-  ctx.imageSmoothingEnabled = smoothing
+/** A redaction's area in whole image pixels, clipped to the image. */
+function redactRect(shape, source) {
+  return [
+    Math.max(0, Math.floor(Math.min(shape.p[0], shape.p[2]))),
+    Math.max(0, Math.floor(Math.min(shape.p[1], shape.p[3]))),
+    Math.min(source.width, Math.ceil(Math.max(shape.p[0], shape.p[2]))),
+    Math.min(source.height, Math.ceil(Math.max(shape.p[1], shape.p[3])))
+  ]
 }
 
-/** Draws one shape; `source` is the image bitmap, which a redaction pixelates. */
+// Why a flat fill and not a mosaic or blur: those keep a signal that can be matched back to text.
+function drawRedaction(ctx, shape, source) {
+  if (!source) return
+  const { x0, y0, width, height, color, hatch } = fillFor(shape, source)
+  if (width <= 0 || height <= 0) return
+  ctx.save()
+  ctx.fillStyle = color
+  ctx.fillRect(x0, y0, width, height)
+  // Diagonal hatching marks the patch as redacted rather than empty.
+  ctx.beginPath()
+  ctx.rect(x0, y0, width, height)
+  ctx.clip()
+  const step = Math.max(8, Math.min(source.width, source.height) / 60)
+  ctx.strokeStyle = hatch
+  ctx.lineWidth = step / 4
+  ctx.beginPath()
+  for (let d = -height; d < width; d += step) {
+    ctx.moveTo(x0 + d, y0 + height)
+    ctx.lineTo(x0 + d + height, y0)
+  }
+  ctx.stroke()
+  ctx.restore()
+}
+
+/** Draws one shape; `source` is the image bitmap, whose mean colour a redaction takes. */
 export function drawShape(ctx, shape, source) {
   if (shape.t === 'redact') return drawRedaction(ctx, shape, source)
   if (shape.t === 'step') return drawStep(ctx, shape)
