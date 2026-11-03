@@ -485,15 +485,20 @@ function markPending() {
   doc.change({ ...s.base, shapes: s.shapes, file, pending: true })
 }
 
+const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]
+
 /**
  * The last file with `shapes` inside it, or with just a note when that is too large. With a
- * redaction, the stand-in adds nothing the last file doesn't hold: its own original, and no shape
- * drawn before the last redaction, which a save burns in. Reopened, the redaction is applied again.
+ * redaction, the stand-in adds nothing the last file doesn't hold: its own original, and no shape a
+ * later redaction covers, which a save burns in. Reopened, the redaction is applied again.
  */
 function standInFile(shapes) {
   if (shapes.length) {
     const last = shapes.findLastIndex((shape) => shape.t === 'redact')
-    const kept = last < 0 ? shapes : shapes.filter((shape, i) => shape.t === 'redact' || i > last)
+    // Shapes a later redaction covers would leak as text; the rest stay, as a real save keeps them.
+    const covered = (shape, i) =>
+      shapes.some((other, j) => j > i && other.t === 'redact' && overlaps(boundsOf(shape), normalizeBox(other.p)))
+    const kept = last < 0 ? shapes : shapes.filter((shape, i) => shape.t === 'redact' || !covered(shape, i))
     const original = last < 0 ? s.original : (readMarkup(s.base.file)?.original ?? s.base.file)
     const scene = { ...serializeScene(kept, s.width, s.height), redraw: true }
     const file = writeMarkup(s.format, s.base.file, original, scene)

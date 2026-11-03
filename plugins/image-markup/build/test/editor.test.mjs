@@ -408,6 +408,27 @@ test('a redaction saved as a stand-in before its encode is applied again on reop
   await reopened.close()
 })
 
+test('a redaction stand-in keeps saved markup outside the redaction', async () => {
+  const { page, frame, errors, close } = await open()
+  await tool(frame, 'Box')
+  await drag(page, frame, SIZE, [[50, 50], [150, 150]])
+  assert.equal(await flush(page), null)
+  await holdEncodes(frame)
+  const before = (await edits(page, { pending: true })).length
+  await page.keyboard.press('x')
+  await drag(page, frame, SIZE, [[290, 290], [630, 370]])
+  await until(async () => (await edits(page, { pending: true })).length > before)
+  const standIn = (await edits(page, { pending: true })).at(-1)
+  await close()
+  assert.deepEqual(readMarkup(standIn).scene.shapes.map((shape) => shape.t), ['box', 'redact'])
+  const reopened = await openEditor(browser)
+  await postImage(reopened.page, reopened.frame, standIn)
+  assert.equal(await info(reopened.frame), '640 × 400 · PNG · 2 marks')
+  assert.deepEqual(reopened.errors, [])
+  assert.deepEqual(errors, [])
+  await reopened.close()
+})
+
 test('a stand-in note that reached disk is not kept by later saves', async () => {
   const plain = await (async () => {
     const editor = await openEditor(browser)
