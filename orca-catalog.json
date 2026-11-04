@@ -451,8 +451,8 @@
       "releases": [
         {
           "version": "2.1.0",
-          "commit": "15ef4f57a08a5a6bdd2d63e9e4f31b09a9b56232",
-          "contentHash": "b2f787723df8a27691e89cf10a7b06d54c7e9997e334b2e0adecaa98c218e8ff",
+          "commit": "411bd261a3f177618e781100ea0719d34ee80342",
+          "contentHash": "963ccd6e9f3d16a38aec280e5f2aaa31ed0c83280a411ac4f5489bdcd91b763f",
           "execution": "sandboxed-ui",
           "minimumOrca": "1.4.248",
           "changelog": "Document sync on Orca's document session, with a three-way merge by element id: a background or grid change is no longer dropped, and different edits at the same element version are no longer taken as the same. One build for Orca's isolated frame; the 5.5 MB single-file fallback is gone. Needs Orca 1.4.248.",
