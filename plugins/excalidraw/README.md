@@ -6,6 +6,24 @@ follows Orca's light or dark theme and language, keeps its shape library across 
 saves image exports (PNG, SVG) through Orca's save dialog. Requires Orca 1.4.248 or later in the
 desktop app; elsewhere Orca opens the file in Source.
 
+## Saving, and drawing with an agent
+
+Edits go to Orca's buffer for the file, as typing in any other file does: the tab shows them as
+unsaved, and the file on disk stays the same until the drawing is saved. An agent reading the file,
+or `orca plugin shot --editor`, sees the saved file only.
+
+- Save with Cmd+S (Ctrl+S on Windows and Linux).
+- Or turn on Settings → Editor → **Auto Save Files**. Orca then saves the drawing after the
+  **Auto Save Delay** (1 second by default), as it does for other files. This is the setting to use
+  when you and an agent take turns on a drawing.
+
+An agent's change to the file on disk shows up on the canvas. If the canvas also has unsaved edits,
+the two are merged by element: an element you changed keeps your change, and the rest takes the
+agent's. When Orca can't merge them, for example when the file is open in a second tab, it shows
+its file-changed banner and you pick which version to keep.
+
+The view (scroll and zoom) is not saved. A drawing opens scrolled to its content.
+
 ## What is in this folder
 
 - `orca-plugin.json`: what Orca loads. The editor runs only in Orca's isolated editor frame
