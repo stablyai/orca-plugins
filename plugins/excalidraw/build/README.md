@@ -76,7 +76,9 @@ state and saving.
 - `orca.shell.openExternal(url)`: opens `http:`, `https:` and `mailto:` element links.
 
 The language follows `orca.locale` (Orca's UI locale), then `navigator.language`. The library is
-kept in `localStorage`, shared by every drawing and kept in step across tabs.
+kept in `localStorage`, shared by every drawing and kept in step across tabs. So is the theme
+picked in the menu (`src/theme-preference.js`): `light` or `dark` overrides Orca's theme (the
+`dark` class Orca puts on `<html>`), and `system` (the default) follows it.
 
 Orca's frames may refuse clipboard writes. Excalidraw then falls back to the copy event and
 `execCommand`; if those fail too, `src/clipboard-fallback.js` keeps the copied shapes for pastes
