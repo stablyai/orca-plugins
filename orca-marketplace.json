@@ -71,6 +71,16 @@
       },
       "description": "Command aliases and optional shortcuts for frequent Orca views.",
       "categories": ["keybindings", "official"]
+    },
+    {
+      "id": "randyellis-wealthberry.paperclip",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/randyellis-wealthberry/paperclip-adapter-orca.git",
+        "ref": "v0.2.0"
+      },
+      "description": "Connect Orca to Paperclip: run Paperclip agents in Orca worktrees and review them on Orca cards.",
+      "categories": ["integrations"]
     }
   ]
 }
