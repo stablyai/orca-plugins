@@ -2,7 +2,7 @@
 
 Draw and edit `.excalidraw` diagrams in Orca's editor, with Excalidraw 0.18. Orca keeps the file:
 its buffer, dirty state, saving, and outside changes such as an agent writing the file. The editor
-follows Orca's light or dark theme and language, keeps its shape library across drawings, and
+follows Orca's light or dark theme (or the one you pick in its menu) and language, keeps its shape library across drawings, and
 saves image exports (PNG, SVG) through Orca's save dialog. Requires Orca 1.4.248 or later in the
 desktop app; elsewhere Orca opens the file in Source.
 
@@ -23,6 +23,12 @@ agent's. When Orca can't merge them, for example when the file is open in a seco
 its file-changed banner and you pick which version to keep.
 
 The view (scroll and zoom) is not saved. A drawing opens scrolled to its content.
+
+## Theme
+
+The canvas follows Orca's light or dark theme until you pick one: open the menu (top left) and
+choose light, dark, or system (follow Orca) under **Theme**, or press Shift+Alt+D. The pick is
+kept for every drawing and applies to open tabs too.
 
 ## What is in this folder
 
