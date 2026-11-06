@@ -450,6 +450,59 @@
       ],
       "releases": [
         {
+          "version": "2.2.0",
+          "commit": "d9a55a421aef2c7e4c0216b53f844cefa98c3728",
+          "contentHash": "6e73aca5234aa1defc4a091fe38f6e5a7ad362c6e34de5971275cef709adf076",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "name": "Excalidraw",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw, .excalidraw.json"
+            },
+            {
+              "kind": "newFiles",
+              "name": "New Excalidraw drawing",
+              "detail": ".excalidraw"
+            }
+          ],
+          "fileTypes": [
+            "excalidraw"
+          ],
+          "editorFileTypes": [
+            "excalidraw"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/excalidraw/images/cover.png",
+              "alt": "A hand-drawn architecture sketch of a web app, API gateway, services and database open in the Excalidraw editor",
+              "sha256": "85cc3391dbb7569b271d8367da9232b9806e0ea0bf183112e34fb304260f327d",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/excalidraw/images/editing.png",
+                "alt": "A box in the sketch selected, with Excalidraw's stroke, fill and font options beside it",
+                "sha256": "cf14ff5105a08d396765816de52be2eba5a0076af20e72f667a29ffcc2521152",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/excalidraw/images/dark.png",
+                "alt": "The same sketch in Excalidraw's dark theme",
+                "sha256": "5db71c99c28336bf8b942de84a8327bf81d23b33d4eff7788c6efed0ebc463c9",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT",
+          "changelog": "Pick the canvas theme apart from Orca's: light, dark, or system (follow Orca) under Theme in the main menu, or Shift+Alt+D. System is the default, so nothing changes until a theme is picked; the pick is shared by every drawing."
+        },
+        {
           "version": "2.1.0",
           "commit": "411bd261a3f177618e781100ea0719d34ee80342",
           "contentHash": "963ccd6e9f3d16a38aec280e5f2aaa31ed0c83280a411ac4f5489bdcd91b763f",
