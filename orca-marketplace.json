@@ -71,6 +71,16 @@
       },
       "description": "Command aliases and optional shortcuts for frequent Orca views.",
       "categories": ["keybindings", "official"]
+    },
+    {
+      "id": "noobitoo.russian",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/NooBiToo/orca-russian.git",
+        "ref": "v1.0.7"
+      },
+      "description": "Complete Russian translation of the Orca interface with native plural forms.",
+      "categories": ["languages"]
     }
   ]
 }
