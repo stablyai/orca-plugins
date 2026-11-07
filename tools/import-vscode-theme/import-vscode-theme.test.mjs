@@ -193,6 +193,9 @@ describe('VS Code theme import', () => {
           'badge.background': '#4d4d4d',
           'tab.inactiveForeground': '#ffffff80',
           'panel.border': '#00000000',
+          'textPreformat.foreground': '#d7ba7d',
+          'textPreformat.background': '#ffffff1a',
+          'textCodeBlock.background': '#0a0a0a66',
           'terminal.ansiRed': '#f14c4c'
         }
       })
@@ -203,6 +206,9 @@ describe('VS Code theme import', () => {
     const complete = real.complete(tokens)
     assert.deepEqual(Object.keys(complete).filter((token) => !(token in real.gate(complete, base))), [])
     assert.ok(!('--border' in tokens))
+    // The chat code tokens need an Orca that knows them (stablyai/orca#39432).
+    const chatCodeTokens = ['--chat-inline-code', '--chat-inline-code-foreground', '--chat-code-block']
+    assert.ok(chatCodeTokens.filter((token) => real.appTokens.has(token)).every((token) => token in tokens))
     // Colors the theme never set stay Orca's own, such as the status hues.
     assert.ok(!Object.keys(tokens).some((token) => token.startsWith('--git-decoration-')))
     // Colors right at 4.5:1 must still pass after Orca rounds each channel.

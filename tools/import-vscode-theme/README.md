@@ -39,11 +39,13 @@ the result, it exits 2 and leaves the files in place.
 - The diff, git decoration, tab, split divider, active workspace row, host badge, chat message
   and link tokens (`--diff-*`, `--git-decoration-*`, `--tab-*`, `--split-divider*`,
   `--worktree-sidebar-active*`, `--host-badge*`, `--chat-user-message`, `--text-link`) need Orca
-  with [stablyai/orca#36578](https://github.com/stablyai/orca/pull/36578). With an older
-  `ORCA_DIR` the tool leaves them out, so the result still validates there.
+  with [stablyai/orca#36578](https://github.com/stablyai/orca/pull/36578). The chat inline code
+  and code block tokens (`--chat-inline-code*`, `--chat-code-block`, from `textPreformat.*` and
+  `textCodeBlock.background`) need [stablyai/orca#39432](https://github.com/stablyai/orca/pull/39432).
+  With an older `ORCA_DIR` the tool leaves them out, so the result still validates there.
 - Orca requires opaque text and surfaces, so translucent VS Code colors are painted onto the
-  editor background. The borders, diff tints, active row, host badge and chat message tokens that
-  Orca accepts translucent keep their alpha.
+  editor background. The borders, diff tints, active row, host badge, chat message, inline code
+  and code block tokens that Orca accepts translucent keep their alpha.
 - The result is run through Orca's own contrast check, with Orca's own derivations for omitted
   tokens. Orca drops both colors of an unreadable text/surface pair, so the tool repairs what it
   would drop instead: a text color moves to the nearest readable one, and a surface keeps its
