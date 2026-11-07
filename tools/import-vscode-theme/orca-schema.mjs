@@ -44,13 +44,22 @@ function builtInColors(orcaDir, tokens) {
 }
 
 export async function loadOrcaSchema(orcaDir) {
-  const loader = path.join(orcaDir, 'config', 'scripts', 'plugin-schema-module-loader.mjs')
-  if (!existsSync(loader)) {
-    throw new Error(`${orcaDir} is not an Orca checkout (missing ${loader})`)
+  // Why both places: Orca later moved its scripts into per-area folders.
+  const loaders = [
+    path.join(orcaDir, 'config', 'scripts', 'plugin-authoring', 'generated-contracts', 'plugin-schema-module-loader.mjs'),
+    path.join(orcaDir, 'config', 'scripts', 'plugin-schema-module-loader.mjs')
+  ]
+  const loader = loaders.find((candidate) => existsSync(candidate))
+  if (!loader) {
+    throw new Error(`${orcaDir} is not an Orca checkout (missing ${loaders[1]})`)
   }
   const { loadPluginSchemaModule } = await import(pathToFileURL(loader).href)
   const artifact = loadPluginSchemaModule('artifacts/plugin-theme-artifact.ts')
-  const terminal = loadPluginSchemaModule('../terminal-custom-themes.ts')
+  const terminal = loadPluginSchemaModule(
+    existsSync(path.join(orcaDir, 'src', 'shared', 'terminal-themes', 'terminal-custom-themes.ts'))
+      ? '../terminal-themes/terminal-custom-themes.ts'
+      : '../terminal-custom-themes.ts'
+  )
   const { safePluginThemeTokens } = loadPluginSchemaModule(
     '../../renderer/src/lib/plugin-theme-tokens.ts'
   )

@@ -42,6 +42,10 @@ export const VSCODE_APP_THEME_COLORS = {
   '--split-divider': ['editorGroup.border'],
   '--split-divider-hover': ['sash.hoverBorder'],
   '--chat-user-message': ['chat.requestBackground'],
+  // The chat tokens below need Orca with stablyai/orca#39432.
+  '--chat-inline-code': ['textPreformat.background'],
+  '--chat-inline-code-foreground': ['textPreformat.foreground'],
+  '--chat-code-block': ['textCodeBlock.background'],
   '--text-link': ['textLink.foreground'],
   '--diff-added': ['gitDecoration.addedResourceForeground', 'editorGutter.addedBackground'],
   '--diff-added-background': [
@@ -78,6 +82,8 @@ export const TRANSLUCENT_APP_THEME_TOKENS = {
   '--split-divider': '--background',
   '--split-divider-hover': '--background',
   '--chat-user-message': '--background',
+  '--chat-inline-code': '--background',
+  '--chat-code-block': '--background',
   '--diff-added-background': '--editor-surface',
   '--diff-added-emphasis': '--editor-surface',
   '--diff-added-gutter': '--editor-surface',
