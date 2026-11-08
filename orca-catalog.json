@@ -451,8 +451,8 @@
       "releases": [
         {
           "version": "2.2.0",
-          "commit": "b2931922e42ea6c3c170b31a359aef0e03857837",
-          "contentHash": "e654bca7232c698c9751fd159f2bf087d401bb1227cb326ea4054842db128dd4",
+          "commit": "71ea8a25892ef52edfb53671540d5dca7425388e",
+          "contentHash": "c73e9cb1412077d61cb2d4ab4fd746f8d01928082023941aef585e03dcd31674",
           "execution": "sandboxed-ui",
           "minimumOrca": "1.4.248",
           "changelog": "Opens and saves .excalidraw.svg and .excalidraw.png images with an embedded drawing. A save keeps the format, draws the image again and embeds the drawing as Excalidraw does, keeping the image's scale, background and dark mode.",
