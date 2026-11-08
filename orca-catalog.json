@@ -443,12 +443,75 @@
         "ref": "main",
         "path": "plugins/excalidraw"
       },
-      "description": "Draw and edit .excalidraw diagrams right in Orca's editor.",
+      "description": "Draw and edit .excalidraw diagrams, and .excalidraw.svg and .excalidraw.png images, right in Orca's editor.",
       "categories": [
         "editors",
         "official"
       ],
       "releases": [
+        {
+          "version": "2.2.0",
+          "commit": "71ea8a25892ef52edfb53671540d5dca7425388e",
+          "contentHash": "c73e9cb1412077d61cb2d4ab4fd746f8d01928082023941aef585e03dcd31674",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "changelog": "Opens and saves .excalidraw.svg and .excalidraw.png images with an embedded drawing. A save keeps the format, draws the image again and embeds the drawing as Excalidraw does, keeping the image's scale, background and dark mode.",
+          "name": "Excalidraw",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw, .excalidraw.json"
+            },
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw.svg"
+            },
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw.png"
+            },
+            {
+              "kind": "newFiles",
+              "name": "New Excalidraw drawing",
+              "detail": ".excalidraw"
+            }
+          ],
+          "fileTypes": [
+            "excalidraw"
+          ],
+          "editorFileTypes": [
+            "excalidraw"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/excalidraw/images/cover.png",
+              "alt": "A hand-drawn architecture sketch of a web app, API gateway, services and database open in the Excalidraw editor",
+              "sha256": "85cc3391dbb7569b271d8367da9232b9806e0ea0bf183112e34fb304260f327d",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/excalidraw/images/editing.png",
+                "alt": "A box in the sketch selected, with Excalidraw's stroke, fill and font options beside it",
+                "sha256": "cf14ff5105a08d396765816de52be2eba5a0076af20e72f667a29ffcc2521152",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/excalidraw/images/dark.png",
+                "alt": "The same sketch in Excalidraw's dark theme",
+                "sha256": "5db71c99c28336bf8b942de84a8327bf81d23b33d4eff7788c6efed0ebc463c9",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
         {
           "version": "2.1.0",
           "commit": "411bd261a3f177618e781100ea0719d34ee80342",

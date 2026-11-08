@@ -1,7 +1,8 @@
 # Excalidraw
 
-Draw and edit `.excalidraw` diagrams in Orca's editor, with Excalidraw 0.18. Orca keeps the file:
-its buffer, dirty state, saving, and outside changes such as an agent writing the file. The editor
+Draw and edit `.excalidraw` diagrams in Orca's editor, with Excalidraw 0.18, and
+`.excalidraw.svg` and `.excalidraw.png` images that carry their drawing. Orca keeps the file: its
+buffer, dirty state, saving, and outside changes such as an agent writing the file. The editor
 follows Orca's light or dark theme and language, keeps its shape library across drawings, and
 saves image exports (PNG, SVG) through Orca's save dialog. Requires Orca 1.4.248 or later in the
 desktop app; elsewhere Orca opens the file in Source.
@@ -24,12 +25,36 @@ its file-changed banner and you pick which version to keep.
 
 The view (scroll and zoom) is not saved. A drawing opens scrolled to its content.
 
+## Images: `.excalidraw.svg` and `.excalidraw.png`
+
+An SVG or PNG exported from Excalidraw with **Embed scene** on carries its drawing. Name it
+`<name>.excalidraw.svg` or `<name>.excalidraw.png` and Orca opens it in this editor. It saves in the
+same format: the drawing goes into the file, and the image is drawn again from it, so the file
+shows what you drew and Excalidraw can open it again. A Markdown file or a web page can show the
+same file that you edit.
+
+- The image keeps the file's export settings: its scale (1×, 2× or 3×), whether it has a
+  background, and dark mode. Excalidraw doesn't save them in the drawing, so they are read from the
+  image. A PNG shows dark mode only through its background; a transparent dark PNG is drawn light.
+- The image is drawn again once you pause, about 0.3 seconds after the last change; the drawing in
+  the file is always the current one. A save waits for the image only as long as Orca's one-second
+  save time allows. A drawing that is slow to draw, or that holds megabytes of pictures, may save
+  with its previous image, and the tab then shows as changed until it is saved again.
+- An empty `.excalidraw.svg` or `.excalidraw.png` file opens as a blank drawing and saves at 1×
+  with a background. "New Excalidraw drawing" makes an `.excalidraw` file.
+- An image without an embedded drawing does not open; export it from Excalidraw with **Embed
+  scene** on.
+- Orca opens a PNG as a binary file. Auto Save does not save it: save with Cmd+S (Ctrl+S on Windows
+  and Linux). An outside change to a PNG shows Orca's file-changed banner instead of merging, and
+  Source shows the picture rather than its text.
+
 ## What is in this folder
 
 - `orca-plugin.json`: what Orca loads. The editor runs only in Orca's isolated editor frame
   (`"frame": "isolated"`).
-- `editor/`: the built editor that Orca loads, `index.html` plus ES module chunks, a stylesheet and
-  fonts in `assets/`. Generated and committed: never edit it by hand.
+- `editor/`: the built editor that Orca loads, `index.html` (and `image.html`, the same editor for
+  images) plus ES module chunks, a stylesheet and fonts in `assets/`. Generated and committed: never
+  edit it by hand.
 - `build/`: the source of `editor/`, the build recipe and the tests. `build/src/scene-sync.js` is
   the document sync: Orca's `orca.document.session()` with a three-way merge by element id, so an
   outside change and this canvas's unsent change both survive. Build steps, the patches it makes to
@@ -37,6 +62,12 @@ The view (scroll and zoom) is not saved. A drawing opens scrolled to its content
 - `templates/`: the blank drawing behind "New Excalidraw drawing".
 
 ## Changelog
+
+### 2.2.0
+
+- Opens and saves `.excalidraw.svg` and `.excalidraw.png` images with an embedded drawing. A save
+  keeps the format, draws the image again and embeds the drawing in Excalidraw's own format, keeping
+  the image's scale, background and dark mode.
 
 ### 2.1.0
 

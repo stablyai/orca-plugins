@@ -24,6 +24,8 @@ affected.
 ## Layout
 
 - `editor/index.html`: the page. It loads the stylesheet and the entry module from `assets/`.
+- `editor/image.html`: the same page marked `<html data-document="image">`, for the
+  `.excalidraw.svg` and `.excalidraw.png` editors.
 - `editor/assets/`: the editor as ES module chunks (code-split), one per locale and lazily loaded
   feature (font subsetting with its worker and WebAssembly, image resizing, Mermaid), and its
   stylesheet.
@@ -33,7 +35,10 @@ affected.
 No file may exceed 10 MiB, the most Orca reads of one plugin file.
 
 Sources: `src/main.js` is the entry and runs `src/editor.jsx`, the React app. `src/scene-sync.js`
-is the document sync (below); it has no Excalidraw import, so its tests run in Node.
+is the document sync (below); it has no Excalidraw import, so its tests run in Node. Nor has
+`src/excalidraw-image.js`, which reads and writes the scene an SVG or PNG image carries, or
+`src/picture-sync.js`, which draws an image's picture again after edits; `src/picture-render.js`
+draws it with Excalidraw.
 
 What the build changes in Excalidraw (`excalidraw-patches.mjs`), and why. Every patch fails the
 build when its pattern is gone:
@@ -82,15 +87,50 @@ Orca's frames may refuse clipboard writes. Excalidraw then falls back to the cop
 `execCommand`; if those fail too, `src/clipboard-fallback.js` keeps the copied shapes for pastes
 inside the frame until it loses focus. "Copy as PNG/SVG" needs the clipboard and fails there.
 
+## Images
+
+The `excalidraw-svg` editor takes `.excalidraw.svg` as text, and `excalidraw-png` takes
+`.excalidraw.png` as bytes (`"contentKind": "bytes"`); the format follows the content kind, so an
+empty file is unambiguous. Both load `image.html`, and the session's value is
+`{ format, elements, appState, files, source, image, stale }`: `image` is the last picture drawn,
+an SVG string or PNG bytes.
+
+- The scene is embedded as Excalidraw does (`data/encode.ts`, `data/image.ts`): JSON deflated and
+  wrapped in `{ version: "1", encoding: "bstring", compressed: true, encoded }`. In an SVG that is
+  base64 between `<!-- payload-start -->` and `<!-- payload-end -->` in `<metadata>`, on one line
+  since Excalidraw's reader takes no line breaks. In a PNG it is a `tEXt` chunk with the keyword
+  `application/vnd.excalidraw+json`, right after `IHDR` (Excalidraw reads only the first `tEXt`).
+  Older payloads (plain JSON, uncompressed) are read too.
+- `encode` must be synchronous and Excalidraw's export is not, so an edit is sent at once with the
+  new scene embedded in the last picture and `stale: true`. `picture-sync.js` then draws the
+  picture once the canvas has been idle for 300 ms, one drawing at a time, and sends it with
+  `change` only while the scene is still `doc.value`. It answers `editor.flush` too, registered
+  before the session so its clock starts with the save: the session sends the scene in the old
+  picture at once while the newest scene is drawn, and the picture goes into the save only if
+  sending it (the session's last encode and decode times, plus 100 ms for the host) still ends
+  within 800 ms of the host's 1 s. Otherwise it is sent after the save. Either way the saved scene
+  is current and only the picture may lag.
+- Excalidraw keeps no export settings in the scene, so `picture-render.js` reads them from the
+  picture. An SVG gives its scale (`width` over the `viewBox` width), background (a first `<rect>`
+  at 0,0 after `<defs>`) and dark mode (`filter="invert(…)"`). A PNG gives its scale from its width
+  and its own scene's bounds plus padding, snapped to 1, 2 or 3, its background from whether its
+  top-left pixel is opaque, and dark mode from that pixel against the scene's background colour. A
+  new file takes Excalidraw's defaults: 1×, background, light.
+- `merge` keeps the outside picture and marks the merged scene stale, so it is drawn again.
+
 ## Tests
 
 `npm test` runs `test/*.test.mjs` with Node's test runner. `test/scene-sync.test.mjs` drives the
 document sync against Orca's real frame session through `mockEditorHost` from `orca/testing`,
 vendored in `test/orca-testing/` (copy `orca-testing.mjs` and `orca-runtime.mjs` from Orca's
 `resources/plugins/declarative/`, or from `orca plugin types`, to update it).
+`test/excalidraw-image.test.mjs` covers the image format and the picture sync against
+`test/fixtures/`: a rectangle and an ellipse exported by Excalidraw 0.18.1 (`exportToSvg` and
+`exportToBlob` with `exportEmbedScene`) as a 2× SVG with a background, a dark transparent SVG, and
+PNGs at 2× light, 1× dark and 1× transparent.
 
 ## Compatibility
 
-`engines.orca` is 1.4.248, the first release with the document session and `"frame": "isolated"`.
-`orca-catalog.json` keeps 2.0.1 listed beneath 2.1.0, so older Orca still installs the version
-that runs in either frame.
+`engines.orca` is 1.4.248, the first release with the document session and `"frame": "isolated"`;
+the image editors' `"contentKind": "bytes"` is older. `orca-catalog.json` keeps 2.0.1 listed
+beneath the newer releases, so older Orca still installs the version that runs in either frame.

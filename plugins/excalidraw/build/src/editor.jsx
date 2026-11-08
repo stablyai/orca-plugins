@@ -1,6 +1,8 @@
-// Orca custom editor for .excalidraw files. Orca owns the buffer, dirty state and saving; the
-// document session (scene-sync.js) sends the canvas's changes and merges outside ones (see
-// build/README.md). `source` preservation and the load baseline follow stablyai/orca#27413 by
+// Orca custom editor for .excalidraw files, and for .excalidraw.svg and .excalidraw.png images that
+// embed their scene (editor/image.html). Orca owns the buffer, dirty state and saving; the
+// document session (scene-sync.js) sends the canvas's changes and merges outside ones, and an
+// image's picture is drawn again after each change (picture-sync.js; see build/README.md).
+// `source` preservation and the load baseline follow stablyai/orca#27413 by
 // Roughriver74, which first brought Excalidraw into Orca's editor. main.js imports this file.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -19,11 +21,15 @@ import {
   useHandleLibrary
 } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
-import { SAVED_APP_STATE, openSceneSession, pickSavedAppState } from './scene-sync.js'
+import { SAVED_APP_STATE, editedScene, openSceneSession, pickSavedAppState } from './scene-sync.js'
+import { syncPicture } from './picture-sync.js'
+import { drawPicture } from './picture-render.js'
 import { libraryAdapter, onLibraryStored } from './library-storage.js'
 import { canSaveFiles } from './orca-file-access.js'
 
 const EXTERNAL_LINK = /^(https?|mailto):/i
+/** Set by image.html: the document is an .excalidraw.svg or .excalidraw.png picture. */
+const IMAGE = document.documentElement.dataset.document === 'image'
 
 /** Host APIs beyond the document. Read once Orca's hello has arrived, which can change them. */
 function readFeatures() {
@@ -109,7 +115,7 @@ function PersistedLibrary({ api }) {
   return null
 }
 
-function App({ doc }) {
+function App({ doc, picture, onApi }) {
   const theme = useTheme()
   // Read once: the session started after Orca's hello brought the locale and host methods.
   const [language] = useState(pickLanguage)
@@ -149,7 +155,8 @@ function App({ doc }) {
     const version = appState.isLoading ? shown.current : sceneVersion(elements, appState, files)
     // Why: Excalidraw normalizes a scene as it loads; that is not an edit, so it only sets the mark.
     if (shown.current !== undefined && version !== shown.current) {
-      doc.change({ elements, appState: pickSavedAppState(appState), files, source: doc.value.source })
+      doc.change(editedScene(doc.value, { elements, appState: pickSavedAppState(appState), files }))
+      picture?.schedule()
     }
     shown.current = version
   }
@@ -157,8 +164,8 @@ function App({ doc }) {
   if (view.scene.error) {
     return (
       <div className="orca-excalidraw-message" role="alert">
-        Cannot display this file as an Excalidraw drawing: {view.scene.error}. Switch to Source to
-        fix it.
+        Cannot display this file as an Excalidraw drawing: {view.scene.error}.
+        {view.scene.format === 'json' && ' Switch to Source to fix it.'}
       </div>
     )
   }
@@ -171,6 +178,7 @@ function App({ doc }) {
         excalidrawAPI={(next) => {
           apiRef.current = next
           setApi(next)
+          onApi(next)
         }}
         onChange={onChange}
         onLinkOpen={(element, event) => onLinkOpen(element, event, apiRef.current, features)}
@@ -206,6 +214,20 @@ function App({ doc }) {
   )
 }
 
+let api = null
+// Before the session, so a save is timed from its start (see picture-sync.js).
+const picture = IMAGE
+  ? syncPicture({
+      render: drawPicture,
+      onError: (error) => {
+        console.error(error)
+        api?.setToast({ message: `Couldn't update the picture in this file: ${error.message}`, closable: true })
+      }
+    })
+  : null
 // Why after the session: it starts once Orca's hello brought the theme, so a dark Orca never shows
 // a light canvas.
-openSceneSession(serialize).then((doc) => createRoot(document.getElementById('root')).render(<App doc={doc} />))
+openSceneSession(serialize, { image: IMAGE, timing: picture?.timing }).then((doc) => {
+  picture?.attach(doc)
+  createRoot(document.getElementById('root')).render(<App doc={doc} picture={picture} onApi={(next) => (api = next)} />)
+})

@@ -37,7 +37,7 @@ Plugins.
 | Taxi Timesheets Syntax | `plugins/taxi` | Highlighting for Taxi `.tks` timesheets |
 | HTTP Request Files | `plugins/http` | Highlighting for `.http` and `.rest` request files |
 | systemd Unit Files | `plugins/systemd` | Highlighting for systemd units and Podman Quadlet files |
-| Excalidraw | `plugins/excalidraw` | An editor for `.excalidraw` diagrams |
+| Excalidraw | `plugins/excalidraw` | An editor for `.excalidraw` diagrams and `.excalidraw.svg` and `.excalidraw.png` images |
 | Word Document Viewer | `plugins/docx` | Read-only `.docx` pages with headers, footers, images and zoom |
 | Image Markup | `plugins/image-markup` | Pen, arrow, box and text markup on images, saved editably into the file |
 | Multipass VM Recipes | `plugins/multipass-recipes` | Disposable Multipass VM workspaces |

@@ -1,6 +1,7 @@
 // Builds ../editor (see README.md):
 //   assets/ (with assets/fonts/)  the editor as ES modules, for Orca's isolated editor frame;
-//   index.html                    the page that loads it.
+//   index.html                    the page that loads it, for .excalidraw files;
+//   image.html                    the same for .excalidraw.svg and .excalidraw.png images.
 // Also writes ../THIRD_PARTY_NOTICES.txt, then runs the tests in test/.
 // Usage: npm ci --ignore-scripts && node build.mjs
 import { build } from 'esbuild'
@@ -66,8 +67,8 @@ const assets = {
   preload: entryOutput.imports.filter((chunk) => chunk.kind === 'import-statement').map((chunk) => guestFile(chunk.path))
 }
 
-const html = `<!doctype html>
-<html>
+const page = (attributes) => `<!doctype html>
+<html${attributes}>
 <head>
 <meta charset="utf-8">
 <title>Excalidraw</title>
@@ -84,7 +85,10 @@ ${assets.preload.map((href) => `<link rel="modulepreload" href="${href}">`).join
 </html>
 `
 
-const written = [{ file: path.join(EDITOR, 'index.html'), bytes: Buffer.from(html) }]
+const written = [
+  { file: path.join(EDITOR, 'index.html'), bytes: Buffer.from(page('')) },
+  { file: path.join(EDITOR, 'image.html'), bytes: Buffer.from(page(' data-document="image"')) }
+]
 for (const file of guest.outputFiles) {
   written.push({ file: file.path, bytes: Buffer.from(file.contents) })
 }
