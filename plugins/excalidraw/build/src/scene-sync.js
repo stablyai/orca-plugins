@@ -1,7 +1,7 @@
 // The drawing's document sync, on Orca's `orca.document.session()`: Orca keeps the buffer, dirty
 // state, saving and flushes; this file only says how a scene is read, written and merged.
 import { parseExcalidrawScene, withExcalidrawSceneSource } from './excalidraw-scene.js'
-import { BLANK_SVG, blankPng, embedPngScene, embedSvgScene, readPngScene, readSvgScene } from './excalidraw-image.js'
+import { BLANK_SVG, blankPng, embedPngScene, embedSvgScene, isPng, readPngScene, readSvgLook, readSvgScene } from './excalidraw-image.js'
 
 /** The canvas settings a `.excalidraw` file keeps; selection, scroll and zoom never reach it. */
 export const SAVED_APP_STATE = ['viewBackgroundColor', 'gridModeEnabled', 'gridSize', 'gridStep']
@@ -27,10 +27,31 @@ export function decodeScene(text) {
   }
 }
 
+const JSON_TEXT = /^\s*\{/
+
+/**
+ * A file renamed from another Excalidraw format (`.excalidraw`, or `.excalidraw.svg` to `.png`), as
+ * its scene JSON and, from an SVG, its look; undefined when the file is in its own format.
+ */
+function renamedScene(format, image) {
+  if (format === 'svg') {
+    return JSON_TEXT.test(image) ? { json: image } : undefined
+  }
+  if (isPng(image)) {
+    return undefined
+  }
+  const text = new TextDecoder().decode(image)
+  if (JSON_TEXT.test(text)) {
+    return { json: text }
+  }
+  return /^\s*(<\?xml[^>]*>\s*)?<svg\b/.test(text) ? { json: readSvgScene(text), look: readSvgLook(text) } : undefined
+}
+
 /**
  * An `.excalidraw.svg` (text) or `.excalidraw.png` (bytes) file as the scene it embeds, plus
  * `image`: the picture as last drawn, and `stale`: whether the scene changed since. An empty file
- * is a blank scene with no picture yet.
+ * is a blank scene with no picture yet. A file renamed from another Excalidraw format opens as its
+ * scene, with no picture: drawing one converts it, as a change that the next save writes.
  */
 export function decodeImageScene(content) {
   const format = content.kind === 'bytes' ? 'png' : 'svg'
@@ -38,6 +59,10 @@ export function decodeImageScene(content) {
     const image = format === 'png' ? new Uint8Array(content.bytes) : content.text
     if (format === 'png' ? image.length === 0 : image.trim() === '') {
       return { format, ...sceneOf(''), image: null, stale: false }
+    }
+    const renamed = renamedScene(format, image)
+    if (renamed) {
+      return { format, ...sceneOf(renamed.json), ...(renamed.look && { look: renamed.look }), image: null, stale: true }
     }
     const json = format === 'png' ? readPngScene(image) : readSvgScene(image)
     return { format, ...sceneOf(json, 'its embedded scene'), image, stale: false }
@@ -90,7 +115,9 @@ export function mergeScenes(base, outside, mine) {
       appState[key] = mine.appState[key]
     }
   }
-  return editedScene(outside, { elements, appState, files: { ...outside.files, ...mine.files } })
+  // A look picked here wins, as a canvas change does.
+  const look = mine.look !== base.look && mine.look ? { look: mine.look } : {}
+  return editedScene(outside, { elements, appState, files: { ...outside.files, ...mine.files }, ...look })
 }
 
 /**

@@ -23,7 +23,7 @@ import {
 import '@excalidraw/excalidraw/index.css'
 import { SAVED_APP_STATE, editedScene, openSceneSession, pickSavedAppState } from './scene-sync.js'
 import { syncPicture } from './picture-sync.js'
-import { drawPicture } from './picture-render.js'
+import { SCALES, drawPicture, lookOf, rememberLook } from './picture-render.js'
 import { libraryAdapter, onLibraryStored } from './library-storage.js'
 import { canSaveFiles } from './orca-file-access.js'
 
@@ -115,6 +115,53 @@ function PersistedLibrary({ api }) {
   return null
 }
 
+/**
+ * The main menu's picture options for an image: how this file's picture is drawn. A new file's
+ * picture starts with the options last picked.
+ */
+function PictureOptions({ doc, picture }) {
+  const [look, setLook] = useState(null)
+  // Why read on each replacement: an outside change can bring a picture with another look.
+  const [read, setRead] = useState(0)
+  useEffect(() => {
+    const replaced = doc.onReplace(() => setRead((count) => count + 1))
+    return () => replaced.dispose()
+  }, [doc])
+  useEffect(() => {
+    let current = true
+    lookOf(doc.value).then((next) => current && setLook(next))
+    return () => {
+      current = false
+    }
+  }, [doc, read])
+  if (!look) {
+    return null
+  }
+  const pick = (event, change) => {
+    // Why: the menu stays open, so several options can be picked in a row.
+    event.preventDefault()
+    const next = { ...look, ...change }
+    rememberLook(next)
+    setLook(next)
+    doc.change({ ...doc.value, look: next, stale: true })
+    picture.schedule()
+  }
+  const nextScale = SCALES[(SCALES.indexOf(look.scale) + 1) % SCALES.length]
+  return (
+    <MainMenu.Group title="Picture in this file">
+      <MainMenu.Item onSelect={(event) => pick(event, { scale: nextScale })} shortcut={`${look.scale}×`}>
+        Scale
+      </MainMenu.Item>
+      <MainMenu.Item onSelect={(event) => pick(event, { background: !look.background })} shortcut={look.background ? 'On' : 'Off'}>
+        Background
+      </MainMenu.Item>
+      <MainMenu.Item onSelect={(event) => pick(event, { dark: !look.dark })} shortcut={look.dark ? 'On' : 'Off'}>
+        Dark mode
+      </MainMenu.Item>
+    </MainMenu.Group>
+  )
+}
+
 function App({ doc, picture, onApi }) {
   const theme = useTheme()
   // Read once: the session started after Orca's hello brought the locale and host methods.
@@ -197,6 +244,8 @@ function App({ doc, picture, onApi }) {
           <MainMenu.DefaultItems.ClearCanvas />
           <MainMenu.Separator />
           <MainMenu.DefaultItems.ChangeCanvasBackground />
+          {picture && !readOnly && <MainMenu.Separator />}
+          {picture && !readOnly && <PictureOptions doc={doc} picture={picture} />}
         </MainMenu>
         <WelcomeScreen>
           <WelcomeScreen.Hints.ToolbarHint />

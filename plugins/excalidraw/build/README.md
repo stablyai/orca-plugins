@@ -92,8 +92,13 @@ inside the frame until it loses focus. "Copy as PNG/SVG" needs the clipboard and
 The `excalidraw-svg` editor takes `.excalidraw.svg` as text, and `excalidraw-png` takes
 `.excalidraw.png` as bytes (`"contentKind": "bytes"`); the format follows the content kind, so an
 empty file is unambiguous. Both load `image.html`, and the session's value is
-`{ format, elements, appState, files, source, image, stale }`: `image` is the last picture drawn,
-an SVG string or PNG bytes.
+`{ format, elements, appState, files, source, image, stale, look? }`: `image` is the last picture
+drawn, an SVG string or PNG bytes, and `look` the export settings picked in the main menu.
+
+- A file in another Excalidraw format than its name says (it was renamed) decodes to its scene
+  with `image: null` and `stale: true`: scene JSON in either editor, or an SVG (with its look) in
+  the PNG editor. `picture-sync.js` draws it once the session is attached, so the tab turns dirty
+  and the next save writes the file's own format.
 
 - The scene is embedded as Excalidraw does (`data/encode.ts`, `data/image.ts`): JSON deflated and
   wrapped in `{ version: "1", encoding: "bstring", compressed: true, encoded }`. In an SVG that is
@@ -114,9 +119,14 @@ an SVG string or PNG bytes.
   picture. An SVG gives its scale (`width` over the `viewBox` width), background (a first `<rect>`
   at 0,0 after `<defs>`) and dark mode (`filter="invert(…)"`). A PNG gives its scale from its width
   and its own scene's bounds plus padding, snapped to 1, 2 or 3, its background from whether its
-  top-left pixel is opaque, and dark mode from that pixel against the scene's background colour. A
-  new file takes Excalidraw's defaults: 1×, background, light.
-- `merge` keeps the outside picture and marks the merged scene stale, so it is drawn again.
+  top-left pixel is opaque, and dark mode from that pixel against the scene's background colour,
+  unless the PNG notes its look: a second `tEXt` chunk, `orca-excalidraw-look`, with
+  `{ scale, background, dark }` as JSON, before `IEND`, which this editor writes and Excalidraw
+  ignores. `scene.look`, set from the main menu, wins over both. A new file takes the look last
+  picked (in `localStorage`, beside the library), else Excalidraw's defaults: 1×, background,
+  light.
+- `merge` keeps the outside picture and marks the merged scene stale, so it is drawn again. A
+  look picked on this canvas since the base wins.
 
 ## Tests
 

@@ -12,6 +12,8 @@ import {
   blankPng,
   embedPngScene,
   embedSvgScene,
+  notePngLook,
+  readNotedPngLook,
   readPngChunks,
   readPngScene,
   readPngSize,
@@ -114,7 +116,8 @@ test('an SVG without a <metadata> element gets one', () => {
 
 test('images without a scene, or that are no images, decode to readable errors', () => {
   assert.match(decodeImageScene({ kind: 'text', text: '<svg xmlns="http://www.w3.org/2000/svg"/>' }).error, /no embedded Excalidraw scene/)
-  assert.match(decodeImageScene({ kind: 'text', text: '{"type":"excalidraw"}' }).error, /not an SVG image/)
+  assert.match(decodeImageScene({ kind: 'text', text: '<html></html>' }).error, /not an SVG image/)
+  assert.match(decodeImageScene({ kind: 'text', text: '{"type":"other"}' }).error, /not an Excalidraw scene/)
   assert.match(decodeImageScene({ kind: 'bytes', bytes: new Uint8Array([1, 2, 3]).buffer }).error, /not a PNG image/)
   assert.match(decodeImageScene({ kind: 'bytes', bytes: blankPng().buffer }).error, /no embedded Excalidraw scene/)
   const damaged = svgFixture.replace(/payload-start -->[^<]{20}/, 'payload-start -->@@@@')
@@ -261,4 +264,51 @@ test('a picture that fails to draw is reported once, and the scene still saves',
   await host.flush()
   assert.deepEqual(errors, ['no canvas'])
   assert.deepEqual(elementIds(readSvgScene(host.text)), ['a'])
+})
+
+test('a file renamed from another Excalidraw format opens as its scene, to be drawn', () => {
+  const json = sceneJson([element('a', 1, 1)])
+  const fromJson = decodeImageScene({ kind: 'text', text: json })
+  assert.deepEqual([fromJson.format, fromJson.image, fromJson.stale], ['svg', null, true])
+  assert.deepEqual(fromJson.elements.map((e) => e.id), ['a'])
+
+  const bytes = (text) => new TextEncoder().encode(text).buffer
+  const pngFromJson = decodeImageScene({ kind: 'bytes', bytes: bytes(json) })
+  assert.deepEqual([pngFromJson.format, pngFromJson.image, pngFromJson.stale], ['png', null, true])
+
+  const pngFromSvg = decodeImageScene({ kind: 'bytes', bytes: bytes(svgFixture) })
+  assert.deepEqual(pngFromSvg.elements.map((e) => e.id), ['box', 'dot'])
+  assert.deepEqual(pngFromSvg.look, readSvgLook(svgFixture))
+  assert.equal(pngFromSvg.stale, true)
+})
+
+test('a renamed file is drawn once open, so saving writes the format its name says', async () => {
+  const doc = await openWithPicture(sceneJson([element('a', 1, 1)]), { render: async () => drawnSvg('converted'), idleMs: 5 })
+  assert.equal(host.edits.length, 0)
+  await tick(30)
+  await host.flush()
+  assert.match(host.text, /data-drawn="converted"/)
+  assert.deepEqual(elementIds(readSvgScene(host.text)), ['a'])
+  assert.equal(doc.value.stale, false)
+})
+
+test("a PNG notes its look beside the scene, and Excalidraw's reader still finds the scene", () => {
+  const look = { scale: 3, background: false, dark: true }
+  assert.equal(readNotedPngLook(pngFixture), undefined)
+  const noted = notePngLook(pngFixture, look)
+  assert.deepEqual(readNotedPngLook(noted), look)
+  const saved = embedPngScene(noted, sceneJson([element('a', 1, 1)]))
+  assert.deepEqual(readNotedPngLook(saved), look)
+  // Excalidraw reads the first tEXt chunk only.
+  const firstText = readPngChunks(saved).find((chunk) => chunk.name === 'tEXt')
+  assert.ok(Buffer.from(firstText.data).toString('latin1').startsWith(`${EXCALIDRAW_MIME}\0`))
+  assert.deepEqual(elementIds(readPngScene(saved)), ['a'])
+  assert.deepEqual(readPngSize(saved), readPngSize(pngFixture))
+})
+
+test('a look picked on this canvas survives a merge', () => {
+  const base = decodeImageScene({ kind: 'text', text: svgFixture })
+  const look = { scale: 2, background: true, dark: true }
+  assert.deepEqual(mergeScenes(base, base, { ...base, look }).look, look)
+  assert.equal(mergeScenes(base, base, base).look, undefined)
 })

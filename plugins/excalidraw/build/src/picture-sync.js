@@ -126,6 +126,10 @@ export function syncPicture({ render, onError, idleMs = IDLE_MS, budgetMs = FLUS
     schedule,
     attach(session) {
       doc = session
+      // A file renamed from another format opens without its picture.
+      if (needsDrawing(doc.value)) {
+        schedule()
+      }
       replaced = doc.onReplace((scene) => {
         if (needsDrawing(scene)) {
           schedule()

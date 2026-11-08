@@ -147,9 +147,12 @@ function crc32(bytes) {
 
 const latin1 = (bytes) => toByteString(bytes)
 
+/** Whether `bytes` start as a PNG file does. */
+export const isPng = (bytes) => bytes.length >= 8 && PNG_SIGNATURE.every((byte, index) => bytes[index] === byte)
+
 /** A PNG's chunks as `{ name, data }`. Throws a readable Error when it is no PNG. */
 export function readPngChunks(bytes) {
-  if (bytes.length < 8 || PNG_SIGNATURE.some((byte, index) => bytes[index] !== byte)) {
+  if (!isPng(bytes)) {
     throw new Error('the file is not a PNG image')
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -193,13 +196,14 @@ export function writePngChunks(chunks) {
   return out
 }
 
-const sceneChunk = (chunk) => {
+const textChunk = (keyword) => (chunk) => {
   if (chunk.name !== 'tEXt') return undefined
   const separator = chunk.data.indexOf(0)
-  return separator !== -1 && latin1(chunk.data.subarray(0, separator)) === EXCALIDRAW_MIME
+  return separator !== -1 && latin1(chunk.data.subarray(0, separator)) === keyword
     ? latin1(chunk.data.subarray(separator + 1))
     : undefined
 }
+const sceneChunk = textChunk(EXCALIDRAW_MIME)
 
 /** The scene JSON an Excalidraw PNG embeds. Throws a readable Error when there is none. */
 export function readPngScene(bytes) {
@@ -218,6 +222,32 @@ export function embedPngScene(bytes, sceneJson) {
   // Why right after IHDR: Excalidraw reads only the first tEXt chunk of a PNG.
   chunks.splice(1, 0, { name: 'tEXt', data: text })
   return writePngChunks(chunks)
+}
+
+// Why its own chunk: unlike an SVG, a PNG's pixels do not say exactly how it was exported, so the
+// editor notes it beside the scene. Excalidraw ignores it (it reads only the first tEXt chunk).
+const LOOK_KEYWORD = 'orca-excalidraw-look'
+const lookChunk = textChunk(LOOK_KEYWORD)
+
+/** The PNG noting `look` (`{ scale, background, dark }`) as how it was drawn. */
+export function notePngLook(bytes, look) {
+  const chunks = readPngChunks(bytes).filter((chunk) => lookChunk(chunk) === undefined)
+  const { scale, background, dark } = look
+  const data = fromByteString(`${LOOK_KEYWORD}\0${JSON.stringify({ scale, background, dark })}`)
+  chunks.splice(chunks.length - 1, 0, { name: 'tEXt', data })
+  return writePngChunks(chunks)
+}
+
+/** The look a PNG notes it was drawn with, or undefined when it notes none. */
+export function readNotedPngLook(bytes) {
+  const text = readPngChunks(bytes).map(lookChunk).find((found) => found !== undefined)
+  try {
+    const { scale, background, dark } = JSON.parse(text)
+    if ([1, 2, 3].includes(scale) && typeof background === 'boolean' && typeof dark === 'boolean') {
+      return { scale, background, dark }
+    }
+  } catch {}
+  return undefined
 }
 
 /** A PNG's size in pixels, from its header. */
