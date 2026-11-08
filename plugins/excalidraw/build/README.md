@@ -104,9 +104,12 @@ an SVG string or PNG bytes.
 - `encode` must be synchronous and Excalidraw's export is not, so an edit is sent at once with the
   new scene embedded in the last picture and `stale: true`. `picture-sync.js` then draws the
   picture once the canvas has been idle for 300 ms, one drawing at a time, and sends it with
-  `change` only while the scene is still `doc.value`. It answers `editor.flush` alongside the
-  session: a save draws the newest scene first, waiting at most 700 ms of the host's 1 s, so the
-  saved scene is current and only the picture may lag.
+  `change` only while the scene is still `doc.value`. It answers `editor.flush` too, registered
+  before the session so its clock starts with the save: the session sends the scene in the old
+  picture at once while the newest scene is drawn, and the picture goes into the save only if
+  sending it (the session's last encode and decode times, plus 100 ms for the host) still ends
+  within 800 ms of the host's 1 s. Otherwise it is sent after the save. Either way the saved scene
+  is current and only the picture may lag.
 - Excalidraw keeps no export settings in the scene, so `picture-render.js` reads them from the
   picture. An SVG gives its scale (`width` over the `viewBox` width), background (a first `<rect>`
   at 0,0 after `<defs>`) and dark mode (`filter="invert(…)"`). A PNG gives its scale from its width

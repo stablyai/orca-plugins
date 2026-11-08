@@ -214,18 +214,20 @@ function App({ doc, picture, onApi }) {
   )
 }
 
+let api = null
+// Before the session, so a save is timed from its start (see picture-sync.js).
+const picture = IMAGE
+  ? syncPicture({
+      render: drawPicture,
+      onError: (error) => {
+        console.error(error)
+        api?.setToast({ message: `Couldn't update the picture in this file: ${error.message}`, closable: true })
+      }
+    })
+  : null
 // Why after the session: it starts once Orca's hello brought the theme, so a dark Orca never shows
 // a light canvas.
-openSceneSession(serialize, { image: IMAGE }).then((doc) => {
-  let api = null
-  const picture = IMAGE
-    ? syncPicture(doc, {
-        render: drawPicture,
-        onError: (error) => {
-          console.error(error)
-          api?.setToast({ message: `Couldn't update the picture in this file: ${error.message}`, closable: true })
-        }
-      })
-    : null
+openSceneSession(serialize, { image: IMAGE, timing: picture?.timing }).then((doc) => {
+  picture?.attach(doc)
   createRoot(document.getElementById('root')).render(<App doc={doc} picture={picture} onApi={(next) => (api = next)} />)
 })

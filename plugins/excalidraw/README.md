@@ -37,9 +37,9 @@ same file that you edit.
   background, and dark mode. Excalidraw doesn't save them in the drawing, so they are read from the
   image. A PNG shows dark mode only through its background; a transparent dark PNG is drawn light.
 - The image is drawn again once you pause, about 0.3 seconds after the last change; the drawing in
-  the file is always the current one. A save waits up to 0.7 seconds for the image. A larger
-  drawing may save with its previous image, and the tab then shows as changed until it is saved
-  again.
+  the file is always the current one. A save waits for the image only as long as Orca's one-second
+  save time allows. A drawing that is slow to draw, or that holds megabytes of pictures, may save
+  with its previous image, and the tab then shows as changed until it is saved again.
 - An empty `.excalidraw.svg` or `.excalidraw.png` file opens as a blank drawing and saves at 1×
   with a background. "New Excalidraw drawing" makes an `.excalidraw` file.
 - An image without an embedded drawing does not open; export it from Excalidraw with **Embed

@@ -95,12 +95,23 @@ export function mergeScenes(base, outside, mine) {
 
 /**
  * Orca's document session for a drawing; `serialize` writes a scene as Excalidraw does. `image`
- * opens `.excalidraw.svg` and `.excalidraw.png` files instead of `.excalidraw` ones.
+ * opens `.excalidraw.svg` and `.excalidraw.png` files instead of `.excalidraw` ones. `timing`, if
+ * given, gets how long the last encode and decode took, as `encodeMs` and `decodeMs`.
  */
-export function openSceneSession(serialize, { image = false } = {}) {
+export function openSceneSession(serialize, { image = false, timing } = {}) {
+  const timed = (key, fn) => (value) => {
+    const started = performance.now()
+    try {
+      return fn(value)
+    } finally {
+      if (timing) {
+        timing[key] = performance.now() - started
+      }
+    }
+  }
   return globalThis.orca.document.session({
-    decode: (content) => (image ? decodeImageScene(content) : decodeScene(content.text)),
-    encode: (scene) => encodeScene(scene, serialize),
+    decode: timed('decodeMs', (content) => (image ? decodeImageScene(content) : decodeScene(content.text))),
+    encode: timed('encodeMs', (scene) => encodeScene(scene, serialize)),
     merge: mergeScenes
   })
 }

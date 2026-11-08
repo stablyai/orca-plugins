@@ -32,6 +32,15 @@ const serialize = ({ elements, appState, files }) =>
   JSON.stringify({ type: 'excalidraw', version: 2, source: 'local', elements: elements.filter((e) => !e.isDeleted), appState, files })
 const elementIds = (json) => JSON.parse(json).elements.map((e) => e.id)
 const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms))
+const drawnSvg = (mark) => `<svg xmlns="http://www.w3.org/2000/svg" data-drawn="${mark}"><metadata></metadata></svg>`
+// As the editor does: the picture's save handler first, then the session.
+async function openWithPicture(text, options, write = serialize) {
+  host = mockEditorHost({ text })
+  picture = syncPicture({ onError: assert.fail, ...options })
+  const doc = await openSceneSession(write, { image: true, timing: picture.timing })
+  picture.attach(doc)
+  return doc
+}
 
 let host
 let picture
@@ -163,15 +172,12 @@ test('a merge keeps the outside picture and marks it for drawing again', async (
 })
 
 test('the picture is drawn again once the canvas is idle, then sent', async () => {
-  host = mockEditorHost({ text: svgFixture })
-  const doc = await openSceneSession(serialize, { image: true })
   const drawn = []
-  picture = syncPicture(doc, {
+  const doc = await openWithPicture(svgFixture, {
     render: async (scene) => {
       drawn.push(scene.elements.map((e) => e.id))
-      return `<svg xmlns="http://www.w3.org/2000/svg" data-drawn="${drawn.length}"><metadata></metadata></svg>`
+      return drawnSvg(drawn.length)
     },
-    onError: assert.fail,
     idleMs: 5
   })
   doc.change({ ...doc.value, elements: [element('a', 1, 1)], stale: true })
@@ -187,22 +193,19 @@ test('the picture is drawn again once the canvas is idle, then sent', async () =
 })
 
 test('a save draws the picture at once, and does not wait past its deadline', async () => {
-  host = mockEditorHost({ text: svgFixture })
-  const doc = await openSceneSession(serialize, { image: true })
   let delayMs = 0
-  picture = syncPicture(doc, {
+  const doc = await openWithPicture(svgFixture, {
     render: async () => {
       await tick(delayMs)
-      return `<svg xmlns="http://www.w3.org/2000/svg" data-delay="${delayMs}"><metadata></metadata></svg>`
+      return drawnSvg(delayMs)
     },
-    onError: assert.fail,
     idleMs: 60_000,
-    flushWaitMs: 100
+    budgetMs: 250
   })
   doc.change({ ...doc.value, elements: [element('a', 1, 1)], stale: true })
   picture.schedule()
   await host.flush()
-  assert.match(host.text, /data-delay="0"/)
+  assert.match(host.text, /data-drawn="0"/)
   assert.deepEqual(elementIds(readSvgScene(host.text)), ['a'])
 
   // A slow picture: the save goes ahead with the new scene in the old picture.
@@ -212,20 +215,39 @@ test('a save draws the picture at once, and does not wait past its deadline', as
   const started = Date.now()
   await host.flush()
   assert.ok(Date.now() - started < 300)
-  assert.match(host.text, /data-delay="0"/)
+  assert.match(host.text, /data-drawn="0"/)
   assert.deepEqual(elementIds(readSvgScene(host.text)), ['b'])
   // It still lands afterwards, as a new edit.
   await tick(450)
   await host.flush()
-  assert.match(host.text, /data-delay="400"/)
+  assert.match(host.text, /data-drawn="400"/)
   assert.deepEqual(elementIds(readSvgScene(host.text)), ['b'])
 })
 
+test('a save leaves the picture out when writing the scene again would not fit', async () => {
+  // Each write takes 150 ms: the save's own and the picture's would not both fit in 350.
+  const slowSerialize = (scene) => {
+    const until = performance.now() + 150
+    while (performance.now() < until);
+    return serialize(scene)
+  }
+  const doc = await openWithPicture(svgFixture, { render: async () => drawnSvg('late'), idleMs: 100, budgetMs: 350 }, slowSerialize)
+  doc.change({ ...doc.value, elements: [element('a', 1, 1)], stale: true })
+  picture.schedule()
+  await host.flush()
+  assert.equal(host.edits.length, 1)
+  assert.doesNotMatch(host.text, /data-drawn/)
+  assert.deepEqual(elementIds(readSvgScene(host.text)), ['a'])
+  // The picture is drawn once the canvas is idle, and sent after the save.
+  await tick(400)
+  await host.flush()
+  assert.match(host.text, /data-drawn="late"/)
+  assert.deepEqual(elementIds(readSvgScene(host.text)), ['a'])
+})
+
 test('a picture that fails to draw is reported once, and the scene still saves', async () => {
-  host = mockEditorHost({ text: svgFixture })
-  const doc = await openSceneSession(serialize, { image: true })
   const errors = []
-  picture = syncPicture(doc, {
+  const doc = await openWithPicture(svgFixture, {
     render: async () => {
       throw new Error('no canvas')
     },

@@ -2,24 +2,51 @@
 // The session's encode is synchronous, so an edit saves its scene at once inside the last picture
 // (the scene is then `stale`); this draws the picture again once the canvas is idle, and sends it.
 
-/** How long a save waits for the picture: Orca gives an editor's whole flush 1 s. */
-export const FLUSH_WAIT_MS = 700
+/**
+ * How long a save may take here. Orca gives an editor's whole flush 1 s, timed on its side, so the
+ * rest is left for the messages and for the frame being busy when the save comes.
+ */
+export const FLUSH_BUDGET_MS = 800
 const IDLE_MS = 300
+// The host's part of sending one edit: posting it, applying it and answering.
+const HOST_MS = 100
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)))
 
 /**
- * `render(scene)` draws a scene's picture. Call `schedule()` after each canvas edit; outside
- * changes that need a new picture (merges) and saves are handled here.
+ * `render(scene)` draws a scene's picture. Make this before the session opens, with `timing` passed
+ * to `openSceneSession`, then `attach` the session: this save handler must run before the
+ * session's, which encodes the scene at once, so the whole save is timed. Call `schedule()` after
+ * each canvas edit; outside changes that need a new picture (merges) and saves are handled here.
  */
-export function syncPicture(doc, { render, onError, idleMs = IDLE_MS, flushWaitMs = FLUSH_WAIT_MS }) {
+export function syncPicture({ render, onError, idleMs = IDLE_MS, budgetMs = FLUSH_BUDGET_MS }) {
+  // The session's last encode and decode: sending the picture takes one of each.
+  const timing = { encodeMs: 0, decodeMs: 0 }
+  let doc = null
+  let replaced = null
   let timer = null
   let drawing = null
   // Why: a scene that failed to draw is not retried until it changes, so a save shows one error.
   let failed = null
+  // A picture drawn during a save waits for it, so only the save decides whether it is sent then.
+  let saving = 0
+  let held = null
   let disposed = false
 
-  const needsDrawing = (scene) => !disposed && !scene.error && scene.stale === true && scene !== failed
+  const needsDrawing = (scene) =>
+    !disposed && !scene.error && scene.stale === true && scene !== failed && scene !== held?.scene
+
+  function apply(scene, image) {
+    // Only the scene it shows may carry it; a newer scene gets its own.
+    if (disposed || doc.value !== scene) {
+      return
+    }
+    if (saving > 0) {
+      held = { scene, image }
+      return
+    }
+    doc.change({ ...scene, image, stale: false })
+  }
 
   function draw() {
     clearTimeout(timer)
@@ -34,12 +61,7 @@ export function syncPicture(doc, { render, onError, idleMs = IDLE_MS, flushWaitM
     drawing = Promise.resolve()
       .then(() => render(scene))
       .then(
-        (image) => {
-          // Only the scene it shows may carry it; a newer scene gets its own.
-          if (!disposed && doc.value === scene) {
-            doc.change({ ...scene, image, stale: false })
-          }
-        },
+        (image) => apply(scene, image),
         (error) => {
           failed = scene
           onError(error)
@@ -59,35 +81,61 @@ export function syncPicture(doc, { render, onError, idleMs = IDLE_MS, flushWaitM
     timer = disposed ? null : setTimeout(draw, idleMs)
   }
 
-  /** Draws the newest scene now, waiting at most `flushWaitMs`, and sends it. */
+  /** Draws the newest scene now, and sends it too if that still fits in the save's time. */
   async function settle() {
-    if (!needsDrawing(doc.value) || doc.readOnly) {
+    const started = performance.now()
+    if (!doc || !needsDrawing(doc.value) || doc.readOnly) {
       return
     }
-    const drawn = (async () => {
-      await draw()
-      // The drawing under way may have been of an older scene.
-      await draw()
-    })()
-    // Why bounded: past Orca's deadline the save fails; the scene saved is current either way,
-    // and a late picture marks the tab changed again.
-    await Promise.race([drawn, delay(flushWaitMs)])
-    await doc.flush()
+    // Why counted: past Orca's deadline the save fails, though the scene it holds is current.
+    const left = () => budgetMs - (performance.now() - started) - (timing.encodeMs + timing.decodeMs + HOST_MS)
+    saving += 1
+    try {
+      // The save begins by sending the new scene in the old picture.
+      await doc.flush()
+      // Why not drawn alongside: drawing a large scene slows that send, and the picture would not fit.
+      if (left() <= 0) {
+        return
+      }
+      const drawn = (async () => {
+        await draw()
+        // The drawing under way may have been of an older scene.
+        await draw()
+      })()
+      await Promise.race([drawn, delay(left())])
+      if (held && held.scene === doc.value && left() >= 0) {
+        const { scene, image } = held
+        held = null
+        doc.change({ ...scene, image, stale: false })
+        await doc.flush()
+      }
+    } finally {
+      saving -= 1
+      // A picture the save left out is sent after it, marking the tab changed again.
+      if (saving === 0 && held) {
+        const { scene, image } = held
+        held = null
+        apply(scene, image)
+      }
+    }
   }
 
-  const replaced = doc.onReplace((scene) => {
-    if (needsDrawing(scene)) {
-      schedule()
-    }
-  })
   const flushes = globalThis.orca.on('editor.flush', settle)
   return {
+    timing,
     schedule,
-    settle,
+    attach(session) {
+      doc = session
+      replaced = doc.onReplace((scene) => {
+        if (needsDrawing(scene)) {
+          schedule()
+        }
+      })
+    },
     dispose() {
       disposed = true
       clearTimeout(timer)
-      replaced.dispose()
+      replaced?.dispose()
       flushes.dispose()
     }
   }
