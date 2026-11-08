@@ -3,9 +3,9 @@
   "id": "orca-excalidraw",
   "publisher": "stablyai",
   "name": "Excalidraw",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "execution": "sandboxed-ui",
-  "description": "Draw and edit .excalidraw diagrams right in Orca's editor.",
+  "description": "Draw and edit .excalidraw diagrams, and .excalidraw.svg and .excalidraw.png images, right in Orca's editor.",
   "license": "MIT",
   "repository": "https://github.com/stablyai/orca-plugins/tree/main/plugins/excalidraw",
   "engines": {
@@ -20,6 +20,25 @@
         "extensions": [".excalidraw", ".excalidraw.json"],
         "entry": "editor/index.html",
         "priority": "default",
+        "frame": "isolated"
+      },
+      {
+        "id": "excalidraw-svg",
+        "title": "Excalidraw",
+        "icon": "images/tab-icon.png",
+        "extensions": [".excalidraw.svg"],
+        "entry": "editor/image.html",
+        "priority": "default",
+        "frame": "isolated"
+      },
+      {
+        "id": "excalidraw-png",
+        "title": "Excalidraw",
+        "icon": "images/tab-icon.png",
+        "extensions": [".excalidraw.png"],
+        "entry": "editor/image.html",
+        "priority": "default",
+        "contentKind": "bytes",
         "frame": "isolated"
       }
     ],
