@@ -35,13 +35,22 @@ same file that you edit.
 
 - The image keeps the file's export settings: its scale (1×, 2× or 3×), whether it has a
   background, and dark mode. Excalidraw doesn't save them in the drawing, so they are read from the
-  image. A PNG shows dark mode only through its background; a transparent dark PNG is drawn light.
+  image. A PNG this editor saved notes them exactly. In a PNG from Excalidraw itself, dark mode shows
+  only through the background, so a transparent dark PNG is read as light.
+- To change them, open the main menu (☰): **Picture in this file** has **Scale**, **Background**
+  and **Dark mode**. A change redraws this file's image, and new images start with the settings
+  you picked last.
 - The image is drawn again once you pause, about 0.3 seconds after the last change; the drawing in
   the file is always the current one. A save waits for the image only as long as Orca's one-second
   save time allows. A drawing that is slow to draw, or that holds megabytes of pictures, may save
   with its previous image, and the tab then shows as changed until it is saved again.
-- An empty `.excalidraw.svg` or `.excalidraw.png` file opens as a blank drawing and saves at 1×
-  with a background. "New Excalidraw drawing" makes an `.excalidraw` file.
+- "New Excalidraw SVG image" and "New Excalidraw PNG image" (in the tab bar's + menu and the
+  command palette) make an image to draw in, as does any empty `.excalidraw.svg` or
+  `.excalidraw.png` file. It starts at 1× with a background, or with the settings you picked last.
+- To turn a drawing into an image, or one image format into the other, rename the file: for
+  example `diagram.excalidraw` to `diagram.excalidraw.svg`, or `.excalidraw.svg` to
+  `.excalidraw.png`. The editor opens the drawing, draws its image (the tab shows as changed), and
+  saving writes the new format. An SVG renamed to PNG keeps its settings.
 - An image without an embedded drawing does not open; export it from Excalidraw with **Embed
   scene** on.
 - Orca opens a PNG as a binary file. Auto Save does not save it: save with Cmd+S (Ctrl+S on Windows
@@ -59,9 +68,17 @@ same file that you edit.
   the document sync: Orca's `orca.document.session()` with a three-way merge by element id, so an
   outside change and this canvas's unsent change both survive. Build steps, the patches it makes to
   Excalidraw and how the editor talks to Orca are in [build/README.md](build/README.md).
-- `templates/`: the blank drawing behind "New Excalidraw drawing".
+- `templates/`: the blank drawing behind "New Excalidraw drawing". New images start empty.
 
 ## Changelog
+
+### 2.3.0
+
+- Images get **Picture in this file** in the main menu, for their scale, background and dark mode;
+  new images start with the last ones picked. A PNG notes them, so it reopens exactly as saved.
+- Renaming an `.excalidraw` file to `.excalidraw.svg` or `.excalidraw.png`, or an SVG image to PNG,
+  converts it on the next save.
+- "New Excalidraw SVG image" and "New Excalidraw PNG image".
 
 ### 2.2.0
 

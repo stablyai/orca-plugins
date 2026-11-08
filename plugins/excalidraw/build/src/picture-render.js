@@ -1,15 +1,37 @@
 // Draws the picture of an `.excalidraw.svg` or `.excalidraw.png` drawing as Excalidraw exports it,
-// keeping the file's export options: its scale, background and dark mode. Excalidraw keeps none
-// of them in the scene, so they are read from the picture itself.
+// keeping the file's export options (its look): scale, background and dark mode. Excalidraw keeps
+// none of them in the scene, so they are read from the picture itself, unless the person picked
+// others for this file (`scene.look`). A file without a picture yet gets the last look picked.
 import { MIME_TYPES, exportToBlob, exportToSvg, getCommonBounds, getNonDeletedElements, restoreElements } from '@excalidraw/excalidraw'
-import { readPngScene, readPngSize, readSvgLook } from './excalidraw-image.js'
+import { notePngLook, readNotedPngLook, readPngScene, readPngSize, readSvgLook } from './excalidraw-image.js'
 import { parseExcalidrawScene } from './excalidraw-scene.js'
 
 // Excalidraw's DEFAULT_EXPORT_PADDING and its export dialog's scales.
 const PADDING = 10
-const SCALES = [1, 2, 3]
-/** How a new, empty file is drawn: Excalidraw's export defaults. */
-const DEFAULT_LOOK = { scale: 1, background: true, dark: false }
+export const SCALES = [1, 2, 3]
+/** Excalidraw's export defaults, for a new file until the person picks a look. */
+const DEFAULT_LOOK = Object.freeze({ scale: 1, background: true, dark: false })
+const LOOK_KEY = 'orca-excalidraw-picture-look'
+
+const isLook = (look) =>
+  SCALES.includes(look?.scale) && typeof look.background === 'boolean' && typeof look.dark === 'boolean'
+
+/** The look a new picture gets: the last one picked in any file (kept like the library). */
+function newLook() {
+  try {
+    const look = JSON.parse(localStorage.getItem(LOOK_KEY))
+    return isLook(look) ? look : DEFAULT_LOOK
+  } catch {
+    return DEFAULT_LOOK
+  }
+}
+
+/** Keeps `look` for the pictures of new files too. */
+export function rememberLook(look) {
+  try {
+    localStorage.setItem(LOOK_KEY, JSON.stringify(look))
+  } catch {}
+}
 
 // Why by identity: a PNG's look takes decoding it, and each picture keeps its look.
 const pngLooks = new WeakMap()
@@ -28,6 +50,10 @@ function pixelOf(source) {
 
 /** A PNG export's look: its scale from its size and scene, background and dark mode from a corner. */
 async function readPngLook(bytes) {
+  const noted = readNotedPngLook(bytes)
+  if (noted) {
+    return noted
+  }
   const { width } = readPngSize(bytes)
   let scale = DEFAULT_LOOK.scale
   let viewBackgroundColor = '#ffffff'
@@ -57,9 +83,13 @@ async function readPngLook(bytes) {
   return { scale, background, dark: background && distance > 96 }
 }
 
-function lookOf(scene) {
+/** How the scene's picture is drawn: as picked for this file, as its picture was, or as new. */
+export function lookOf(scene) {
+  if (isLook(scene.look)) {
+    return Promise.resolve(scene.look)
+  }
   if (!scene.image) {
-    return Promise.resolve(DEFAULT_LOOK)
+    return Promise.resolve(newLook())
   }
   if (scene.format === 'svg') {
     return Promise.resolve(readSvgLook(scene.image))
@@ -98,7 +128,7 @@ export async function drawPicture(scene) {
     exportPadding: PADDING,
     getDimensions: (width, height) => ({ width: width * look.scale, height: height * look.scale, scale: look.scale })
   })
-  const image = new Uint8Array(await blob.arrayBuffer())
+  const image = notePngLook(new Uint8Array(await blob.arrayBuffer()), look)
   pngLooks.set(image, Promise.resolve(look))
   return image
 }
