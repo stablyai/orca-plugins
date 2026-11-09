@@ -71,6 +71,16 @@
       },
       "description": "Command aliases and optional shortcuts for frequent Orca views.",
       "categories": ["keybindings", "official"]
+    },
+    {
+      "id": "rftglyv.discord-presence",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/rftglyv/orca-discord-presence.git",
+        "ref": "v0.4.2"
+      },
+      "description": "Discord Rich Presence for your agent fleet: live status badges, rotating taglines, daily stats, and a local settings page.",
+      "categories": ["integrations"]
     }
   ]
 }
