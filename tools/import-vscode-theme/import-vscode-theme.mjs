@@ -12,6 +12,7 @@ import {
 import path from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
+import { orcaScript } from '../../scripts/orca-script.mjs'
 import { loadOrcaSchema } from './orca-schema.mjs'
 import { renderThemePlugin } from './theme-conversion.mjs'
 import { containedFile, readVscodeThemes, ThemeReadError } from './theme-reading.mjs'
@@ -189,7 +190,7 @@ for (const warning of warnings) {
   console.warn(`warning: ${warning}`)
 }
 
-const validator = path.join(orcaDir, 'config', 'scripts', 'validate-plugin-files.mjs')
+const validator = orcaScript(orcaDir, 'content-validation', 'validate-plugin-files.mjs')
 try {
   process.stdout.write(
     execFileSync(process.execPath, [validator, target], {

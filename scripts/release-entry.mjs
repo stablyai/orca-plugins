@@ -7,6 +7,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
+import { orcaScript } from './orca-script.mjs'
 
 const CATALOG_ROOT = path.resolve(import.meta.dirname, '..')
 const CATALOG = path.join(CATALOG_ROOT, 'orca-catalog.json')
@@ -18,7 +19,7 @@ if (!orcaDir) {
   console.error('set ORCA_DIR to an Orca checkout with dependencies installed')
   process.exit(2)
 }
-const validator = path.join(orcaDir, 'config', 'scripts', 'validate-plugin-files.mjs')
+const validator = orcaScript(orcaDir, 'content-validation', 'validate-plugin-files.mjs')
 const write = process.argv.includes('--write')
 const errors = []
 const catalog = JSON.parse(readFileSync(CATALOG, 'utf8'))
