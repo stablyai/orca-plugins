@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
+import { orcaScript } from './orca-script.mjs'
 
 const CATALOG_ROOT = path.resolve(import.meta.dirname, '..')
 const CATALOG = path.join(CATALOG_ROOT, 'orca-catalog.json')
@@ -20,7 +21,7 @@ if (!orcaDir) {
   console.error('set ORCA_DIR to an Orca checkout with dependencies installed')
   process.exit(2)
 }
-const validator = path.join(orcaDir, 'config', 'scripts', 'validate-plugin-files.mjs')
+const validator = orcaScript(orcaDir, 'content-validation', 'validate-plugin-files.mjs')
 const errors = []
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'))
 
@@ -131,7 +132,7 @@ for (const file of walk(ASSETS)) {
 
 // 4. orca-marketplace.json = Orca's legacy export of orca-catalog.json, then the frozen v1-only entries.
 const { legacyPluginCatalog } = await import(
-  pathToFileURL(path.join(orcaDir, 'config', 'scripts', 'export-legacy-plugin-catalog.mjs')).href
+  pathToFileURL(orcaScript(orcaDir, 'content-validation', 'export-legacy-plugin-catalog.mjs')).href
 )
 const legacy = readJson(LEGACY)
 const legacyOnly = new Set(readJson(LEGACY_ONLY).ids)
