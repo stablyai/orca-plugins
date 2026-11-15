@@ -3,7 +3,7 @@
   "id": "orca-excalidraw",
   "publisher": "stablyai",
   "name": "Excalidraw",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "execution": "sandboxed-ui",
   "description": "Draw and edit .excalidraw diagrams, and .excalidraw.svg and .excalidraw.png images, right in Orca's editor.",
   "license": "MIT",

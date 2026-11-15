@@ -3,7 +3,7 @@
   "id": "orca-sqlite-browser",
   "publisher": "stablyai",
   "name": "SQLite Browser",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "execution": "sandboxed-ui",
   "description": "Browse and query SQLite databases in Orca's editor: tables, views and schema, SQL queries, column filters and sorting, copy and CSV export. Read-only.",
   "license": "MIT",
