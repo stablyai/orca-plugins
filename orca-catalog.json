@@ -484,8 +484,8 @@
       "releases": [
         {
           "version": "2.6.0",
-          "commit": "93259bcadd2408a79bbfc126b96e3d880c260876",
-          "contentHash": "ca231b04bd629808010816c20fa85a3587bad5badef4a245c37e4e256cdac6bf",
+          "commit": "cbd0e759230bf93e31393412b4e3f5f61d1f1335",
+          "contentHash": "134969f1c63502cabef97a497df70dcac969d727412c2ccebe101018b26badb9",
           "execution": "sandboxed-ui",
           "minimumOrca": "1.4.248",
           "name": "Excalidraw",
