@@ -450,6 +450,69 @@
       ],
       "releases": [
         {
+          "version": "2.5.0",
+          "commit": "46aed43faac98491dfee7991f6d64363329e9e09",
+          "contentHash": "3c13abd4a26359cbb5226c51ae0c9cc999470ff863325889e50b88f31c204aca",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "name": "Excalidraw",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw, .excalidraw.json"
+            },
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw.svg"
+            },
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw.png"
+            },
+            {
+              "kind": "newFiles",
+              "name": "New Excalidraw drawing",
+              "detail": ".excalidraw"
+            }
+          ],
+          "fileTypes": [
+            "excalidraw"
+          ],
+          "editorFileTypes": [
+            "excalidraw"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/excalidraw/images/cover.png",
+              "alt": "A hand-drawn architecture sketch of a web app, API gateway, services and database open in the Excalidraw editor",
+              "sha256": "85cc3391dbb7569b271d8367da9232b9806e0ea0bf183112e34fb304260f327d",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/excalidraw/images/editing.png",
+                "alt": "A box in the sketch selected, with Excalidraw's stroke, fill and font options beside it",
+                "sha256": "cf14ff5105a08d396765816de52be2eba5a0076af20e72f667a29ffcc2521152",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/excalidraw/images/dark.png",
+                "alt": "The same sketch in Excalidraw's dark theme",
+                "sha256": "5db71c99c28336bf8b942de84a8327bf81d23b33d4eff7788c6efed0ebc463c9",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT",
+          "changelog": "Pick the canvas theme apart from Orca's: light, dark, or system (follow Orca) under Theme in the main menu, or Shift+Alt+D. System is the default, so nothing changes until a theme is picked; the pick is shared by every drawing and image. An image's picture keeps its own dark mode."
+        },
+        {
           "version": "2.4.0",
           "commit": "469fa0b143d9adb9971e194b97ee36830b8d7675",
           "contentHash": "a6ee3bf821d2b653f0e5889272c8add13a83fa8192101bc6763041464dad4d57",
