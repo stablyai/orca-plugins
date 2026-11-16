@@ -944,6 +944,68 @@
       ],
       "releases": [
         {
+          "version": "2.0.2",
+          "commit": "52e19db107bce5fec1bd6b4b66db9e54fee4463c",
+          "contentHash": "52474de095fd77fc9c37484e66f190e54a70568842ad27ad41ac4279370f4f3a",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "name": "Spreadsheet",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Spreadsheet",
+              "detail": ".xlsx, .xlsm, .xlsb, .xls, .ods"
+            }
+          ],
+          "fileTypes": [
+            "xlsx",
+            "xlsm",
+            "xlsb",
+            "xls",
+            "ods"
+          ],
+          "editorFileTypes": [
+            "xlsx",
+            "xlsm",
+            "xlsb",
+            "xls",
+            "ods"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/spreadsheet/images/editing-cover.png",
+              "alt": "A quarterly summary workbook being edited: East's revenue changed and the totals recalculated, and a formula typed into a new Target column",
+              "sha256": "9b9d7be4eed1fd0c1a7e743fb718d6227661ee4dd1b7813a720c512fcc342f6a",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/spreadsheet/images/editing.png",
+                "alt": "Two rows selected with the cell menu open: insert rows above or below, delete rows, insert or delete columns, clear contents",
+                "sha256": "4bf69a3d594d6545d51a27cf895fbd433cecf96decd1d056d7d09f403746062a",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/spreadsheet/images/large-sheet.png",
+                "alt": "A 50,000-row data sheet with a block of cells selected and its count, sum and average in the status bar",
+                "sha256": "138c43ecd911f630b89d5290f9fb28fcefd33068bc38dcc8e8a351eef28887bd",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/spreadsheet/images/editing-dark.png",
+                "alt": "The summary workbook in Orca's dark theme after an edit, with the changed revenue, recalculated totals and a #DIV/0! error in red",
+                "sha256": "b7fdb8e3e2604e015b9a6e5af00d3d7b69d8eea810ad76ba6f7bbe8482b00b39",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
+        {
           "version": "2.0.1",
           "commit": "7052077d75e572688be3c7bc3d1e6826f88fc3ed",
           "contentHash": "cc62ceae5a9c1cc4726537e0801244e193fff277cb7fa6e1edf6900d05adcc54",
