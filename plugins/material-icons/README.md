@@ -1,6 +1,6 @@
 # Material Icon Theme for Orca
 
-Colorful file and folder icons from [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme) in Orca: about 470 file types and names, from TypeScript and Rust to Dockerfiles, lockfiles and CI configs, plus icons for common folders such as `src`, `docs`, `tests` and `.github`.
+Colorful file and folder icons from [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme) in Orca: about 450 file types and names, from TypeScript, Rust and C++ to assembly, Dockerfiles, lockfiles and CI configs, plus icons for common folders such as `src`, `docs`, `tests` and `.github`.
 
 ![Material Icons in Orca's file explorer with a dark theme](../../assets/orca-material-icons/dark.png)
 
@@ -24,11 +24,13 @@ Folders are matched by their own name, with an open variant when expanded: `src`
 ## Differences from Material Icon Theme
 
 - **Common folders only.** Material has icons for thousands of folder names; this plugin maps the 19 most common ones above. Workspace root folders have no special icon.
-- **A curated set.** Orca allows 512 mappings per icon theme, so this plugin covers the most common file names and extensions rather than all of Material's. A few of Material's icons are left out because they are drawn with SVG features Orca doesn't allow in icon files.
+- **A curated set.** Orca allows 512 mappings per icon theme, so this plugin covers the most common file names and extensions rather than all of Material's. A few of Material's icons are left out because they are drawn with SVG features Orca doesn't allow in icon files. A file name is listed only when its extension doesn't already give it the same icon: `cargo.toml` gets the TOML icon from `.toml`.
+- **Compiled object files.** Material shows `.o` and `.obj` with its 3D-model icon. Here they get an object-file icon drawn for this plugin, a page with binary digits, because in a code project they are usually compiler output. A Wavefront `.obj` model shows the same icon.
+- **`.out` files.** Only `a.out` gets the executable icon. Other `.out` files are as often program or test output as binaries, so they keep the plain file icon.
 
 ## Rebuilding
 
-The icon themes are generated from a Material Icon Theme release by [`material-icons-build.py`](https://github.com/brennanb2025/orca-plugins/blob/main/tools/material-icons-build.py), which holds the curated lists of file names and extensions.
+The icon themes are generated from a Material Icon Theme release by [`material-icons-build.py`](https://github.com/brennanb2025/orca-plugins/blob/main/tools/material-icons-build.py), which holds the curated lists of file names and extensions. Version 1.2.0 edited `icons/theme.json` and `icons/theme-light.json` by hand: it added the C++, assembly, object, library and binary mappings and `icons/object.svg`, and removed file names their extension already covers. Carry those changes into the script before rebuilding.
 
 ## License
 

@@ -1,1 +1,3 @@
 Icons from Material Icon Theme 5.39.0 (https://github.com/material-extensions/vscode-material-icon-theme), MIT.
+
+icons/object.svg was drawn for this plugin from the page outline of Material Icon Theme's dll icon, and is released under the same MIT license.
