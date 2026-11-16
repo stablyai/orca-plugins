@@ -16,7 +16,6 @@ function fakeDocument(initial = null) {
 }
 
 const appState = (scrollX, scrollY, zoom) => ({ scrollX, scrollY, zoom: { value: zoom } })
-const rest = () => new Promise((resolve) => setTimeout(resolve, 20))
 
 test('reopens at the kept view, and at the content when none was kept', () => {
   assert.deepEqual(keptView(fakeDocument({ scrollX: -40, scrollY: 12.5, zoom: 1.5 })), appState(-40, 12.5, 1.5))
@@ -27,14 +26,23 @@ test('reopens at the kept view, and at the content when none was kept', () => {
   assert.equal(keptView({}), null)
 })
 
-test('keeps the view once the canvas rests, and only when it moved', async () => {
+test('keeps a move at once, then where a continued move stopped; an unmoved canvas posts nothing', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
   const documentApi = fakeDocument({ scrollX: 0, scrollY: 0, zoom: 1 })
-  const keep = viewKeeper(documentApi, 5)
+  const keep = viewKeeper(documentApi, 100)
   keep(appState(0, 0, 1))
-  await rest()
   assert.deepEqual(documentApi.posted, [])
-  keep(appState(10, 0, 1))
+  // A single zoom is kept before anything could unload the frame.
+  keep(appState(0, 0, 2))
+  assert.deepEqual(documentApi.posted, [{ scrollX: 0, scrollY: 0, zoom: 2 }])
+  keep(appState(10, 0, 2))
   keep(appState(30, 5, 2))
-  await rest()
-  assert.deepEqual(documentApi.posted, [{ scrollX: 30, scrollY: 5, zoom: 2 }])
+  assert.equal(documentApi.posted.length, 1)
+  t.mock.timers.tick(100)
+  assert.deepEqual(documentApi.posted.at(-1), { scrollX: 30, scrollY: 5, zoom: 2 })
+  // Edits that leave the view alone, after it rested.
+  t.mock.timers.tick(100)
+  keep(appState(30, 5, 2))
+  t.mock.timers.tick(100)
+  assert.equal(documentApi.posted.length, 2)
 })
