@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { orcaScript } from '../../scripts/orca-script.mjs'
 import { parseCssColor } from './color-math.mjs'
 
 /** Writes out a rule Orca derives a token by: the first present source, or a foreground mix. */
@@ -44,23 +45,18 @@ function builtInColors(orcaDir, tokens) {
 }
 
 export async function loadOrcaSchema(orcaDir) {
-  // Why both places: Orca later moved its scripts into per-area folders.
-  const loaders = [
-    path.join(orcaDir, 'config', 'scripts', 'plugin-authoring', 'generated-contracts', 'plugin-schema-module-loader.mjs'),
-    path.join(orcaDir, 'config', 'scripts', 'plugin-schema-module-loader.mjs')
-  ]
-  const loader = loaders.find((candidate) => existsSync(candidate))
-  if (!loader) {
-    throw new Error(`${orcaDir} is not an Orca checkout (missing ${loaders[1]})`)
-  }
+  const loader = orcaScript(orcaDir, 'generated-contracts', 'plugin-schema-module-loader.mjs')
   const { loadPluginSchemaModule } = await import(pathToFileURL(loader).href)
   const artifact = loadPluginSchemaModule('artifacts/plugin-theme-artifact.ts')
-  const terminal = loadPluginSchemaModule(
-    existsSync(path.join(orcaDir, 'src', 'shared', 'terminal-themes', 'terminal-custom-themes.ts'))
-      ? '../terminal-themes/terminal-custom-themes.ts'
-      : '../terminal-custom-themes.ts'
-  )
-  const { safePluginThemeTokens } = loadPluginSchemaModule(
+  // Why both places: Orca later moved these modules. Each path is relative to src/shared/plugins,
+  // the folder the loader resolves from.
+  const loadMoved = (...files) =>
+    loadPluginSchemaModule(
+      files.find((file) => existsSync(path.join(orcaDir, 'src', 'shared', 'plugins', file))) ?? files.at(-1)
+    )
+  const terminal = loadMoved('../terminal-themes/terminal-custom-themes.ts', '../terminal-custom-themes.ts')
+  const { safePluginThemeTokens } = loadMoved(
+    '../../renderer/src/app-shell/appearance/plugin-theme-tokens.ts',
     '../../renderer/src/lib/plugin-theme-tokens.ts'
   )
   const appTokens = new Set(artifact.PLUGIN_APP_THEME_TOKENS)
