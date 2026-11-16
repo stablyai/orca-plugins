@@ -483,6 +483,68 @@
       ],
       "releases": [
         {
+          "version": "2.6.0",
+          "commit": "9b30cb1d8ec6a3442fd39d7e35d577c069680f2e",
+          "contentHash": "85c47381620986707b027fc6d9742c523fff77eb956e86b1dcb8b956b3abaf56",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "name": "Excalidraw",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw, .excalidraw.json"
+            },
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw.svg"
+            },
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw.png"
+            },
+            {
+              "kind": "newFiles",
+              "name": "New Excalidraw drawing",
+              "detail": ".excalidraw"
+            }
+          ],
+          "fileTypes": [
+            "excalidraw"
+          ],
+          "editorFileTypes": [
+            "excalidraw"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/excalidraw/images/cover.png",
+              "alt": "A hand-drawn architecture sketch of a web app, API gateway, services and database open in the Excalidraw editor",
+              "sha256": "85cc3391dbb7569b271d8367da9232b9806e0ea0bf183112e34fb304260f327d",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/excalidraw/images/editing.png",
+                "alt": "A box in the sketch selected, with Excalidraw's stroke, fill and font options beside it",
+                "sha256": "cf14ff5105a08d396765816de52be2eba5a0076af20e72f667a29ffcc2521152",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/excalidraw/images/dark.png",
+                "alt": "The same sketch in Excalidraw's dark theme",
+                "sha256": "5db71c99c28336bf8b942de84a8327bf81d23b33d4eff7788c6efed0ebc463c9",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
+        {
           "version": "2.5.0",
           "commit": "1f6dd0176ad4fa5d134db1feb7a3f9c5053e8c86",
           "contentHash": "3c13abd4a26359cbb5226c51ae0c9cc999470ff863325889e50b88f31c204aca",

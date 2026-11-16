@@ -75,6 +75,12 @@ state and saving.
 - The file's own `source` is kept, so saving from Orca does not rewrite it. Excalidraw normalizes a
   scene as it loads; the first change it reports after a load only sets the baseline, so opening a
   file never dirties it.
+- `orca.document.setViewState(view)` (`src/view-state.js`) keeps the canvas's `scrollX`, `scrollY`
+  and zoom for this tab; it never reaches the file. Every view change is posted (Excalidraw reports
+  a pan at most once a frame, and Orca gives view posts their own lane); edits that leave the view
+  alone post nothing. Nothing waits on a timer: Orca unloads the frame when another tab shows, so a
+  pending post would be lost. The canvas mounts at `orca.document.getViewState()` instead of
+  scrolling to its content. An Orca without these methods scrolls to the content.
 - `orca.files.saveAs({ suggestedName, mimeType, data })`: "Save to…" and image export (PNG, SVG).
   It needs the click's activation; when an export outlasts it, a "Save…" button asks for a new
   click. It resolves `{ status: 'saved' | 'cancelled' }`.
