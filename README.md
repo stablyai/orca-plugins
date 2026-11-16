@@ -62,3 +62,5 @@ node scripts/render-theme-covers.mjs
 ```
 
 These are illustrative theme previews, rather than captured Orca sessions.
+
+Random test text: a tiny orca juggles marshmallows under a purple moon.
