@@ -106,6 +106,10 @@ tab-separated text fills cells from the active one; a single value fills the who
 
 ## Changelog
 
+### 2.0.2
+
+- New grid tab icon that matches Orca's other icons.
+
 ### 2.0.0
 
 - Editing: cell values and formulas, inserting and deleting rows and columns, clearing, paste, and
