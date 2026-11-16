@@ -7,12 +7,42 @@
   },
   "fileNames": {
     "package.json": "icons/package.svg",
-    "orca-plugin.json": "icons/plugin.svg"
+    "orca-plugin.json": "icons/plugin.svg",
+    "a.out": "icons/binary.svg"
   },
   "fileExtensions": {
     "ts": "icons/typescript.svg",
     "tsx": "icons/typescript.svg",
     "md": "icons/markdown.svg",
-    "json": "icons/json.svg"
+    "json": "icons/json.svg",
+    "cpp": "icons/cpp.svg",
+    "cc": "icons/cpp.svg",
+    "cxx": "icons/cpp.svg",
+    "c++": "icons/cpp.svg",
+    "hpp": "icons/cpp.svg",
+    "hh": "icons/cpp.svg",
+    "hxx": "icons/cpp.svg",
+    "h++": "icons/cpp.svg",
+    "inl": "icons/cpp.svg",
+    "ipp": "icons/cpp.svg",
+    "tpp": "icons/cpp.svg",
+    "tcc": "icons/cpp.svg",
+    "ixx": "icons/cpp.svg",
+    "cppm": "icons/cpp.svg",
+    "asm": "icons/assembly.svg",
+    "s": "icons/assembly.svg",
+    "inc": "icons/assembly.svg",
+    "arm": "icons/assembly.svg",
+    "a64": "icons/assembly.svg",
+    "o": "icons/object.svg",
+    "obj": "icons/object.svg",
+    "a": "icons/object.svg",
+    "lib": "icons/object.svg",
+    "so": "icons/binary.svg",
+    "dylib": "icons/binary.svg",
+    "dll": "icons/binary.svg",
+    "exe": "icons/binary.svg",
+    "bin": "icons/binary.svg",
+    "elf": "icons/binary.svg"
   }
 }

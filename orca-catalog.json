@@ -214,12 +214,45 @@
         "ref": "main",
         "path": "plugins/minimal-icons"
       },
-      "description": "A compact monochrome icon theme for common source files.",
+      "description": "A compact, mostly monochrome icon theme for common source files, C++, assembly and compiled binaries.",
       "categories": [
         "icons",
         "official"
       ],
       "releases": [
+        {
+          "version": "2.1.0",
+          "commit": "513fb24f281857a3a1f5e48c759ba30bcb839f1c",
+          "contentHash": "4390bb758b6bb3a34fa0a68f4a4b6815adab1f85b71e7396de4599a5a0a9e948",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "Orca Minimal Icons",
+          "contributes": [
+            {
+              "kind": "iconThemes",
+              "name": "Minimal"
+            }
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/minimal-icons/images/cover.png",
+              "alt": "The Minimal icons in the file explorer and eight of the icons the theme provides",
+              "sha256": "60565d006e8dd868eae755fa131195ec62cab829135ad0d8c866b3ec61f1b311",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/minimal-icons/images/explorer.png",
+                "alt": "Minimal icons in the explorer and editor tabs",
+                "sha256": "a485fd14f4e0950e90a5ac31faf9793442723553679fc7acccc78d78f66d2fcf",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
         {
           "version": "2.0.1",
           "commit": "83daff3cf0621ef15062d7df35eef5ff275bffee",
@@ -451,7 +484,7 @@
       "releases": [
         {
           "version": "2.5.0",
-          "commit": "46aed43faac98491dfee7991f6d64363329e9e09",
+          "commit": "1f6dd0176ad4fa5d134db1feb7a3f9c5053e8c86",
           "contentHash": "3c13abd4a26359cbb5226c51ae0c9cc999470ff863325889e50b88f31c204aca",
           "execution": "sandboxed-ui",
           "minimumOrca": "1.4.248",
@@ -3018,12 +3051,49 @@
         "ref": "main",
         "path": "plugins/material-icons"
       },
-      "description": "Colorful Material file icons for about 470 file types and names, with a variant for light themes.",
+      "description": "Colorful Material file icons for about 450 file types and names, with a variant for light themes.",
       "categories": [
         "icons",
         "official"
       ],
       "releases": [
+        {
+          "version": "1.2.0",
+          "commit": "275c8533dfac79517fe4ce0763825725efca0d6f",
+          "contentHash": "351586c116416b17d813d21ec4f3da8d29ac0033bebd4167843b62f2d6828c18",
+          "execution": "data",
+          "minimumOrca": "1.4.245",
+          "name": "Material Icon Theme for Orca",
+          "contributes": [
+            {
+              "kind": "iconThemes",
+              "name": "Material Icons"
+            },
+            {
+              "kind": "iconThemes",
+              "name": "Material Icons (Light)"
+            }
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-material-icons/dark.png",
+              "alt": "Material Icons in Orca's file explorer and editor tabs, dark mode",
+              "sha256": "0d372d31c4545f22403861ebbb9589cba9327db3cdc4f991d63800eeac9a3c85",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/orca-material-icons/light.png",
+                "alt": "Material Icons (Light) in Orca's file explorer and editor tabs, light mode",
+                "sha256": "86642fbb7e7237556b6c724f8c8a642e7a4f0e28862e6ab58257cda4008ff18a",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          }
+        },
         {
           "version": "1.1.0",
           "commit": "a501d84f15f796248f12678fd92e1f22e50bead4",
