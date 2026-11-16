@@ -23,7 +23,9 @@ the two are merged by element: an element you changed keeps your change, and the
 agent's. When Orca can't merge them, for example when the file is open in a second tab, it shows
 its file-changed banner and you pick which version to keep.
 
-The view (scroll and zoom) is not saved. A drawing opens scrolled to its content.
+The view (scroll and zoom) is not saved in the file. Switching to another tab and back keeps it
+while Orca runs, in Orca releases that keep an editor's view; a drawing otherwise opens scrolled to
+its content.
 
 ## Theme
 
@@ -80,6 +82,12 @@ same file that you edit.
 - `templates/`: the blank drawing behind "New Excalidraw drawing". New images start empty.
 
 ## Changelog
+
+### 2.6.0
+
+- Switching tabs no longer resets the canvas: a drawing reopens at the scroll and zoom it had in
+  that tab, on Orca releases with `orca.document.setViewState`. Older Orca still opens it scrolled
+  to its content.
 
 ### 2.5.0
 

@@ -27,6 +27,7 @@ import { SCALES, drawPicture, lookOf, rememberLook } from './picture-render.js'
 import { libraryAdapter, onLibraryStored } from './library-storage.js'
 import { canSaveFiles } from './orca-file-access.js'
 import { effectiveTheme, onThemePreferenceStored, readThemePreference, storeThemePreference } from './theme-preference.js'
+import { keptView, viewKeeper } from './view-state.js'
 
 const EXTERNAL_LINK = /^(https?|mailto):/i
 /** Set by image.html: the document is an .excalidraw.svg or .excalidraw.png picture. */
@@ -180,6 +181,7 @@ function App({ doc, picture, onApi }) {
   const [features] = useState(readFeatures)
   const options = useMemo(() => uiOptions(features), [features])
   const [view, setView] = useState(() => ({ scene: doc.value, mountKey: 0 }))
+  const [keepView] = useState(viewKeeper)
   const [readOnly, setReadOnly] = useState(doc.readOnly)
   const apiRef = useRef(null)
   // useHandleLibrary needs the API as state; the sync reads the ref.
@@ -204,12 +206,18 @@ function App({ doc, picture, onApi }) {
     return () => [replaced, readOnlyChanges].forEach((subscription) => subscription.dispose())
   }, [doc, view.scene.error])
 
-  const initialData = useMemo(
-    () => (view.scene.error ? null : { ...restoreScene(view.scene), scrollToContent: true }),
-    [view.scene]
-  )
+  const initialData = useMemo(() => {
+    if (view.scene.error) {
+      return null
+    }
+    const restored = restoreScene(view.scene)
+    // Where this tab left the canvas; a first open scrolls to the content.
+    const kept = keptView()
+    return kept ? { ...restored, appState: { ...restored.appState, ...kept } } : { ...restored, scrollToContent: true }
+  }, [view.scene])
 
   const onChange = (elements, appState, files) => {
+    keepView(appState)
     // Why both checks: Shift+Alt+D changes Excalidraw's theme without the menu, so keep it as the
     // pick. After the prop changes, Excalidraw reports once more with the old theme; that is
     // not a change from the last report, so it is not taken for a pick.
