@@ -44,9 +44,8 @@ same file that you edit.
   the file is always the current one. A save waits for the image only as long as Orca's one-second
   save time allows. A drawing that is slow to draw, or that holds megabytes of pictures, may save
   with its previous image, and the tab then shows as changed until it is saved again.
-- "New Excalidraw SVG image" and "New Excalidraw PNG image" (in the tab bar's + menu and the
-  command palette) make an image to draw in, as does any empty `.excalidraw.svg` or
-  `.excalidraw.png` file. It starts at 1× with a background, or with the settings you picked last.
+- Any empty `.excalidraw.svg` or `.excalidraw.png` file opens as an image to draw in. It starts at
+  1× with a background, or with the settings you picked last.
 - To turn a drawing into an image, or one image format into the other, rename the file: for
   example `diagram.excalidraw` to `diagram.excalidraw.svg`, or `.excalidraw.svg` to
   `.excalidraw.png`. The editor opens the drawing, draws its image (the tab shows as changed), and
@@ -71,6 +70,12 @@ same file that you edit.
 - `templates/`: the blank drawing behind "New Excalidraw drawing". New images start empty.
 
 ## Changelog
+
+### 2.4.0
+
+- One "New Excalidraw drawing" entry in the + menu and command palette; the SVG and PNG image
+  entries are gone. Rename a drawing to `.excalidraw.svg` or `.excalidraw.png` to make an image.
+- New pen icon that matches Orca's other menu icons.
 
 ### 2.3.0
 
