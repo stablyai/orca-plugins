@@ -450,6 +450,78 @@
       ],
       "releases": [
         {
+          "version": "2.3.1",
+          "commit": "7052077d75e572688be3c7bc3d1e6826f88fc3ed",
+          "contentHash": "4c2f85d182ce1ab193110cc18a028c6763f14c2103831c6eb4af0d489205c116",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "name": "Excalidraw",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw, .excalidraw.json"
+            },
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw.svg"
+            },
+            {
+              "kind": "customEditors",
+              "name": "Excalidraw",
+              "detail": ".excalidraw.png"
+            },
+            {
+              "kind": "newFiles",
+              "name": "New Excalidraw drawing",
+              "detail": ".excalidraw"
+            },
+            {
+              "kind": "newFiles",
+              "name": "New Excalidraw SVG image",
+              "detail": ".excalidraw.svg"
+            },
+            {
+              "kind": "newFiles",
+              "name": "New Excalidraw PNG image",
+              "detail": ".excalidraw.png"
+            }
+          ],
+          "fileTypes": [
+            "excalidraw"
+          ],
+          "editorFileTypes": [
+            "excalidraw"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/excalidraw/images/cover.png",
+              "alt": "A hand-drawn architecture sketch of a web app, API gateway, services and database open in the Excalidraw editor",
+              "sha256": "85cc3391dbb7569b271d8367da9232b9806e0ea0bf183112e34fb304260f327d",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/excalidraw/images/editing.png",
+                "alt": "A box in the sketch selected, with Excalidraw's stroke, fill and font options beside it",
+                "sha256": "cf14ff5105a08d396765816de52be2eba5a0076af20e72f667a29ffcc2521152",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/excalidraw/images/dark.png",
+                "alt": "The same sketch in Excalidraw's dark theme",
+                "sha256": "5db71c99c28336bf8b942de84a8327bf81d23b33d4eff7788c6efed0ebc463c9",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
+        {
           "version": "2.3.0",
           "commit": "91ac97f004a0869cf8d1afe550fc66ff0b8c1e43",
           "contentHash": "0021d2487d5fb04e76f14fd7a35f744bec0169b361e4bcdc6ad06fbc84ccdb71",
@@ -809,6 +881,68 @@
         "official"
       ],
       "releases": [
+        {
+          "version": "2.0.1",
+          "commit": "7052077d75e572688be3c7bc3d1e6826f88fc3ed",
+          "contentHash": "cc62ceae5a9c1cc4726537e0801244e193fff277cb7fa6e1edf6900d05adcc54",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "name": "Spreadsheet",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Spreadsheet",
+              "detail": ".xlsx, .xlsm, .xlsb, .xls, .ods"
+            }
+          ],
+          "fileTypes": [
+            "xlsx",
+            "xlsm",
+            "xlsb",
+            "xls",
+            "ods"
+          ],
+          "editorFileTypes": [
+            "xlsx",
+            "xlsm",
+            "xlsb",
+            "xls",
+            "ods"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/spreadsheet/images/editing-cover.png",
+              "alt": "A quarterly summary workbook being edited: East's revenue changed and the totals recalculated, and a formula typed into a new Target column",
+              "sha256": "9b9d7be4eed1fd0c1a7e743fb718d6227661ee4dd1b7813a720c512fcc342f6a",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/spreadsheet/images/editing.png",
+                "alt": "Two rows selected with the cell menu open: insert rows above or below, delete rows, insert or delete columns, clear contents",
+                "sha256": "4bf69a3d594d6545d51a27cf895fbd433cecf96decd1d056d7d09f403746062a",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/spreadsheet/images/large-sheet.png",
+                "alt": "A 50,000-row data sheet with a block of cells selected and its count, sum and average in the status bar",
+                "sha256": "138c43ecd911f630b89d5290f9fb28fcefd33068bc38dcc8e8a351eef28887bd",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/spreadsheet/images/editing-dark.png",
+                "alt": "The summary workbook in Orca's dark theme after an edit, with the changed revenue, recalculated totals and a #DIV/0! error in red",
+                "sha256": "b7fdb8e3e2604e015b9a6e5af00d3d7b69d8eea810ad76ba6f7bbe8482b00b39",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
         {
           "version": "2.0.0",
           "commit": "d678e96719d41853286298e238dd7e2957ad784c",
@@ -2183,6 +2317,37 @@
       ],
       "releases": [
         {
+          "version": "2.0.1",
+          "commit": "7052077d75e572688be3c7bc3d1e6826f88fc3ed",
+          "contentHash": "d47bf321918aa95c27643ef736d96ae6ccc98c62a59edb1d3ac8a67e89421492",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "name": "Word Document Viewer",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Word Preview",
+              "detail": ".docx"
+            }
+          ],
+          "fileTypes": [
+            "docx"
+          ],
+          "editorFileTypes": [
+            "docx"
+          ],
+          "license": "MIT",
+          "images": {
+            "cover": {
+              "path": "assets/orca-docx/cover.jpg",
+              "alt": "Illustration of a document preview and blue document icon",
+              "sha256": "6c183bc8a56414e8bda11f9e3ea1393979165077776dfd3a279a00f80ffb50a1",
+              "width": 1586,
+              "height": 992
+            }
+          }
+        },
+        {
           "version": "2.0.0",
           "commit": "45761d66a16b487638776f626cee727b58f71d72",
           "contentHash": "57f917a2790e29b33e35e49f77aff5a4fbb9f6fe0c4f04348f42fb2fa90888e1",
@@ -2261,6 +2426,49 @@
         "official"
       ],
       "releases": [
+        {
+          "version": "2.0.1",
+          "commit": "7052077d75e572688be3c7bc3d1e6826f88fc3ed",
+          "contentHash": "983026652002b9daaadfaa0f0e2dccbef2d87541dab2b5b26a75328fd387afce",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "name": "Image Markup",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "Markup",
+              "detail": ".png, .jpg, .jpeg, .webp, .gif, .bmp, .avif"
+            }
+          ],
+          "fileTypes": [
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "gif",
+            "bmp",
+            "avif"
+          ],
+          "editorFileTypes": [
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "gif",
+            "bmp",
+            "avif"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/image-markup/images/cover.webp",
+              "alt": "A sunlit reading nook in Image Markup, with a red ellipse around the chair and an arrow pointing to it from a Cozy corner label",
+              "sha256": "45a43a6c45b04e0382050cb9c78f90a18cf3146cc79163d049c2fa6d082d7137",
+              "width": 1600,
+              "height": 1000
+            }
+          },
+          "license": "MIT"
+        },
         {
           "version": "2.0.0",
           "commit": "d5c95b67c9befdccd78bfeffa2434b1a1ec60a5f",
@@ -2719,6 +2927,59 @@
         "official"
       ],
       "releases": [
+        {
+          "version": "2.0.1",
+          "commit": "7052077d75e572688be3c7bc3d1e6826f88fc3ed",
+          "contentHash": "c9f5f40475b69b78921941d0d300b2d8c24e545c1395518f1546a187100e1cf0",
+          "execution": "sandboxed-ui",
+          "minimumOrca": "1.4.248",
+          "name": "SQLite Browser",
+          "contributes": [
+            {
+              "kind": "customEditors",
+              "name": "SQLite",
+              "detail": ".db, .sqlite, .sqlite3, .db3"
+            }
+          ],
+          "fileTypes": [
+            "db",
+            "sqlite",
+            "sqlite3",
+            "db3"
+          ],
+          "editorFileTypes": [
+            "db",
+            "sqlite",
+            "sqlite3",
+            "db3"
+          ],
+          "images": {
+            "cover": {
+              "path": "plugins/sqlite-browser/images/cover.png",
+              "alt": "A music database in Orca: tracks sorted by length, filtered to lyrics with night, and the selected cell's full text below the grid",
+              "sha256": "b1d09b818f47e3d82df9c4ac432fc2ef1f0d94e6e9d2532aef2b2fcce7fbbc27",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "plugins/sqlite-browser/images/query.png",
+                "alt": "A SQL query over the tracks table, its rows sorted by length and filtered by title, in a light theme",
+                "sha256": "7d1078ccb573bb3d746bc7a6c5543ab1ec5fe8c9bfdda8e5e2e08574f7dd2dba",
+                "width": 1600,
+                "height": 1000
+              },
+              {
+                "path": "plugins/sqlite-browser/images/schema.png",
+                "alt": "The schema page listing the CREATE statement of every table, view, index and trigger",
+                "sha256": "d0cddaa1f820242ae286ef606d23ef69ee4afad4328b28ee83070016471779f3",
+                "width": 1600,
+                "height": 1000
+              }
+            ]
+          },
+          "license": "MIT"
+        },
         {
           "version": "2.0.0",
           "commit": "ae89b423ae5c7b09c5180ed65e85a85addfe723d",

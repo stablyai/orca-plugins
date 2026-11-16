@@ -3,7 +3,7 @@
   "id": "orca-docx",
   "publisher": "stablyai",
   "name": "Word Document Viewer",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "execution": "sandboxed-ui",
   "description": "Read Word (.docx) documents in Orca: page layout, find, tracked changes, comments, links and zoom.",
   "license": "MIT",
