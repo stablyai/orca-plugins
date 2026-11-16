@@ -3,9 +3,9 @@
   "id": "orca-minimal-icons",
   "publisher": "stablyai",
   "name": "Orca Minimal Icons",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "execution": "data",
-  "description": "A compact monochrome icon theme for common source files.",
+  "description": "A compact, mostly monochrome icon theme for common source files, C++, assembly and compiled binaries.",
   "license": "MIT",
   "repository": "https://github.com/stablyai/orca-plugins/tree/main/plugins/minimal-icons",
   "engines": {
@@ -23,7 +23,7 @@
   "capabilities": [],
   "cover": {
     "path": "images/cover.png",
-    "alt": "The Minimal icons in the file explorer and the eight icons the theme provides"
+    "alt": "The Minimal icons in the file explorer and eight of the icons the theme provides"
   },
   "screenshots": [
     {
