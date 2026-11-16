@@ -3,7 +3,7 @@
   "id": "orca-spreadsheet",
   "publisher": "stablyai",
   "name": "Spreadsheet",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "execution": "sandboxed-ui",
   "description": "Open and edit Excel and OpenDocument spreadsheets in Orca's editor: cells, formulas, rows and columns, with undo. Saves .xlsx, .xlsm and .ods in place, keeping their formatting.",
   "license": "MIT",
