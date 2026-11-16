@@ -3,8 +3,8 @@
 Draw and edit `.excalidraw` diagrams in Orca's editor, with Excalidraw 0.18, and
 `.excalidraw.svg` and `.excalidraw.png` images that carry their drawing. Orca keeps the file: its
 buffer, dirty state, saving, and outside changes such as an agent writing the file. The editor
-follows Orca's light or dark theme (or the one you pick in its menu) and language, keeps its shape library across drawings, and
-saves image exports (PNG, SVG) through Orca's save dialog. Requires Orca 1.4.248 or later in the
+follows Orca's language and its light or dark theme (or the one you pick in its menu), keeps its
+shape library across drawings, and saves image exports (PNG, SVG) through Orca's save dialog. Requires Orca 1.4.248 or later in the
 desktop app; elsewhere Orca opens the file in Source.
 
 ## Saving, and drawing with an agent
@@ -27,9 +27,13 @@ The view (scroll and zoom) is not saved. A drawing opens scrolled to its content
 
 ## Theme
 
-The canvas follows Orca's light or dark theme until you pick one: open the menu (top left) and
+The canvas follows Orca's light or dark theme until you pick one: open the main menu (☰) and
 choose light, dark, or system (follow Orca) under **Theme**, or press Shift+Alt+D. The pick is
-kept for every drawing and applies to open tabs too.
+kept for every drawing and image and applies to open tabs too.
+
+The theme is only how the canvas looks to you; it is not saved in the file. In an
+`.excalidraw.svg` or `.excalidraw.png` image, whether the picture in the file is dark is set
+separately, by **Dark mode** under **Picture in this file** (see below).
 
 ## Images: `.excalidraw.svg` and `.excalidraw.png`
 
@@ -76,6 +80,12 @@ same file that you edit.
 - `templates/`: the blank drawing behind "New Excalidraw drawing". New images start empty.
 
 ## Changelog
+
+### 2.5.0
+
+- Pick the canvas theme apart from Orca's: light, dark, or system (follow Orca) under **Theme** in
+  the main menu, or Shift+Alt+D. System is the default. The pick is shared by every drawing and
+  image and applies to open tabs; an image's picture keeps its own dark mode.
 
 ### 2.4.0
 
