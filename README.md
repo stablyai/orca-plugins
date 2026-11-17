@@ -1,4 +1,4 @@
-# Orca plugins
+# Orca Plugins
 
 The official plugin catalog for [Orca](https://github.com/stablyai/orca), and the source of the
 official plugins. Orca reads the catalog to show the plugins you can install from Settings →
