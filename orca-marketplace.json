@@ -71,6 +71,16 @@
       },
       "description": "Command aliases and optional shortcuts for frequent Orca views.",
       "categories": ["keybindings", "official"]
+    },
+    {
+      "id": "noobitoo.quick-prompts",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/NooBiToo/orca-quick-prompts.git",
+        "ref": "v0.2.1"
+      },
+      "description": "One-click prompt snippets for agent terminals: side panel, palette commands, personal library.",
+      "categories": ["productivity"]
     }
   ]
 }
